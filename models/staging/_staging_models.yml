@@ -1,0 +1,304 @@
+version: 2
+
+models:
+
+  # ---------------------------------------------------------------------------
+  # CRM
+  # ---------------------------------------------------------------------------
+
+  - name: stg_crm__customers
+    description: >
+      Capa Staging de clientes de CRM. Renombra y tipifica columnas, filtra
+      registros borrados logicamente. Cada fila es un cliente activo unico.
+    columns:
+      - name: customer_id
+        description: "Identificador unico del cliente (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: person_id
+        description: "FK a persona en el sistema fuente"
+      - name: store_id
+        description: "FK a tienda asociada"
+      - name: territory_id
+        description: "FK a territorio de ventas"
+      - name: account_number
+        description: "Numero de cuenta del cliente"
+        tests:
+          - not_null
+      - name: name
+        description: "Nombre completo del cliente"
+        tests:
+          - not_null
+      - name: email_address
+        description: "Direccion de correo electronico"
+      - name: phone
+        description: "Telefono de contacto"
+      - name: _ingested_at
+        description: "Timestamp de ingestion del registro en la landing zone"
+        tests:
+          - not_null
+      - name: _is_deleted
+        description: "Flag de borrado logico — siempre 0 en esta capa"
+      - name: _dbt_loaded_at
+        description: "Timestamp de cuando dbt proceso este registro"
+        tests:
+          - not_null
+
+  - name: stg_crm__addresses
+    description: >
+      Capa Staging de direcciones de clientes de CRM. Tipifica y filtra
+      registros borrados. Cada fila es una direccion activa unica.
+    columns:
+      - name: address_id
+        description: "Identificador unico de la direccion (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "FK al cliente propietario de la direccion"
+        tests:
+          - not_null
+      - name: address_line1
+        description: "Primera linea de la direccion"
+        tests:
+          - not_null
+      - name: address_line2
+        description: "Segunda linea de la direccion (puede ser nula)"
+      - name: city
+        description: "Ciudad"
+        tests:
+          - not_null
+      - name: state_province_id
+        description: "FK a estado/provincia"
+      - name: postal_code
+        description: "Codigo postal"
+      - name: country_region
+        description: "Pais o region"
+      - name: _ingested_at
+        description: "Timestamp de ingestion del registro"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de cuando dbt proceso este registro"
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # ERP
+  # ---------------------------------------------------------------------------
+
+  - name: stg_erp__order_headers
+    description: >
+      Capa Staging de cabeceras de ordenes de venta del ERP. Tipifica fechas,
+      montos y flags. Filtra registros borrados logicamente.
+    columns:
+      - name: sales_order_id
+        description: "Identificador unico de la orden de venta (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "FK al cliente"
+        tests:
+          - not_null
+      - name: order_date
+        description: "Fecha en que se realizo la orden"
+        tests:
+          - not_null
+      - name: due_date
+        description: "Fecha de vencimiento comprometida"
+      - name: ship_date
+        description: "Fecha real de envio"
+      - name: status
+        description: "Estado de la orden (1-6)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6]
+              config:
+                severity: warn
+      - name: online_order_flag
+        description: "1 si la orden fue realizada en linea"
+      - name: sales_order_number
+        description: "Numero de orden legible"
+      - name: sub_total
+        description: "Subtotal sin impuestos ni flete"
+        tests:
+          - not_null
+      - name: total_due
+        description: "Total a cobrar incluyendo impuestos y flete"
+        tests:
+          - not_null
+      - name: _ingested_at
+        description: "Timestamp de ingestion"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt"
+        tests:
+          - not_null
+
+  - name: stg_erp__order_details
+    description: >
+      Capa Staging de lineas de detalle de ordenes del ERP. Cada fila representa
+      un producto dentro de una orden de venta.
+    columns:
+      - name: sales_order_id
+        description: "FK a la cabecera de orden"
+        tests:
+          - not_null
+      - name: sales_order_detail_id
+        description: "Identificador unico de la linea de detalle (PK junto con sales_order_id)"
+        tests:
+          - not_null
+      - name: product_id
+        description: "FK al producto"
+        tests:
+          - not_null
+      - name: order_qty
+        description: "Cantidad de unidades ordenadas"
+        tests:
+          - not_null
+      - name: unit_price
+        description: "Precio unitario sin descuento"
+        tests:
+          - not_null
+      - name: unit_price_discount
+        description: "Porcentaje de descuento sobre el precio unitario"
+      - name: line_total
+        description: "Total de la linea calculado"
+        tests:
+          - not_null
+      - name: _ingested_at
+        description: "Timestamp de ingestion"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt"
+        tests:
+          - not_null
+
+  - name: stg_erp__products
+    description: >
+      Capa Staging del catalogo de productos del ERP. Incluye precios, costos
+      y atributos fisicos del producto.
+    columns:
+      - name: product_id
+        description: "Identificador unico del producto (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: product_number
+        description: "Codigo alfanumerico del producto"
+        tests:
+          - not_null
+      - name: product_name
+        description: "Nombre del producto"
+        tests:
+          - not_null
+      - name: standard_cost
+        description: "Costo estandar de produccion"
+      - name: list_price
+        description: "Precio de lista al publico"
+      - name: finished_goods_flag
+        description: "1 si es producto terminado; 0 si es componente"
+      - name: color
+        description: "Color del producto (puede ser nulo)"
+      - name: size
+        description: "Talla o tamano"
+      - name: weight
+        description: "Peso en la unidad definida por el sistema fuente"
+      - name: _ingested_at
+        description: "Timestamp de ingestion"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt"
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # HR
+  # ---------------------------------------------------------------------------
+
+  - name: stg_hr__employees
+    description: >
+      Capa Staging de empleados del sistema de RRHH. Incluye datos personales
+      y laborales. Filtra registros borrados.
+    columns:
+      - name: business_entity_id
+        description: "Identificador unico del empleado (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: national_id_number
+        description: "Numero de identificacion nacional"
+        tests:
+          - not_null
+      - name: login_id
+        description: "ID de login en el dominio"
+      - name: job_title
+        description: "Titulo del cargo"
+        tests:
+          - not_null
+      - name: birth_date
+        description: "Fecha de nacimiento"
+      - name: marital_status
+        description: "Estado civil (M/S)"
+        tests:
+          - accepted_values:
+              values: ['M', 'S']
+              config:
+                severity: warn
+      - name: gender
+        description: "Genero (M/F)"
+        tests:
+          - accepted_values:
+              values: ['M', 'F']
+              config:
+                severity: warn
+      - name: hire_date
+        description: "Fecha de contratacion"
+        tests:
+          - not_null
+      - name: salaried_flag
+        description: "1 si el empleado es asalariado"
+      - name: vacation_hours
+        description: "Horas de vacaciones disponibles"
+      - name: sick_leave_hours
+        description: "Horas de licencia por enfermedad disponibles"
+      - name: _ingested_at
+        description: "Timestamp de ingestion"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt"
+        tests:
+          - not_null
+
+  - name: stg_hr__departments
+    description: >
+      Capa Staging del catalogo de departamentos del sistema de RRHH.
+    columns:
+      - name: department_id
+        description: "Identificador unico del departamento (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: name
+        description: "Nombre del departamento"
+        tests:
+          - not_null
+      - name: group_name
+        description: "Grupo funcional al que pertenece el departamento"
+        tests:
+          - not_null
+      - name: _ingested_at
+        description: "Timestamp de ingestion"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt"
+        tests:
+          - not_null

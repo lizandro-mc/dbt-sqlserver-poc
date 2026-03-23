@@ -1,0 +1,28 @@
+# Profiles para dbt-sqlserver-poc
+# Compatible con SQL Server 2016+ / Docker dev (SQL Server 2017 CU31)
+#
+# Requiere el driver ODBC instalado:
+#   brew install microsoft/mssql-release/msodbcsql17  (macOS)
+#   apt-get install msodbcsql17                       (Ubuntu/Debian)
+#
+# Variables de entorno requeridas (ver .env.example):
+#   SQL_SERVER_PASSWORD  — contrasena del usuario de SQL Server
+#
+# Variable opcional:
+#   SQL_SERVER_USER      — usuario (default: sa)
+
+dbt_sqlserver_poc:
+  target: dev
+  outputs:
+    dev:
+      type: sqlserver
+      driver: "ODBC Driver 17 for SQL Server"
+      server: localhost
+      port: 1433
+      database: db_cibao_dev
+      schema: dbo
+      authentication: sql
+      username: "{{ env_var('SQL_SERVER_USER', 'sa') }}"
+      password: "{{ env_var('SQL_SERVER_PASSWORD', 'test') }}"
+      trust_cert: true
+      threads: 4

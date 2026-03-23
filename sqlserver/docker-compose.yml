@@ -1,0 +1,42 @@
+services:
+  sqlserver:
+    # SQL Server 2017 CU31 (última actualización de 2017, ~equivalente SP3)
+    # Ubuntu 16.04 — compatible con on-premise SQL Server 2016 (compat level 130)
+    # MSSQL_PID=Standard simula Standard Edition
+    image: mcr.microsoft.com/mssql/server:2017-latest
+    container_name: sqlserver-cibao
+    hostname: sqlserver-cibao
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "P@ssw0rd123!"
+      MSSQL_PID: "Standard"
+      MSSQL_COLLATION: "SQL_Latin1_General_CP1_CI_AS"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./init:/init
+    restart: unless-stopped
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "P@ssw0rd123!" -Q "SELECT 1" || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  adminer:
+    image: adminer:latest
+    container_name: adminer-cibao
+    ports:
+      - "8888:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: sqlserver-cibao
+      ADMINER_DESIGN: pepa-linha
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+    name: sqlserver_cibao_data

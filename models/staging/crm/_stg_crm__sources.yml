@@ -1,0 +1,82 @@
+version: 2
+
+sources:
+  - name: raw_crm
+    description: >
+      Datos de CRM cargados en la landing zone de SQL Server.
+      Contiene informacion de clientes y direcciones ingresada desde el sistema CRM.
+    database: dbt_cibao_raw
+    schema: raw_crm
+    tables:
+
+      - name: customers
+        description: "Tabla de clientes raw con datos de contacto e identificacion."
+        freshness:
+          warn_after: { count: 1, period: day }
+          error_after: { count: 3, period: day }
+        loaded_at_field: _ingested_at
+        columns:
+          - name: customer_id
+            description: "Identificador unico del cliente"
+            tests:
+              - not_null
+              - unique
+          - name: person_id
+            description: "FK a persona en el sistema fuente"
+          - name: store_id
+            description: "FK a tienda asociada"
+          - name: territory_id
+            description: "FK a territorio de ventas"
+          - name: account_number
+            description: "Numero de cuenta del cliente"
+          - name: name
+            description: "Nombre del cliente"
+          - name: email_address
+            description: "Direccion de correo electronico"
+          - name: phone
+            description: "Telefono de contacto"
+          - name: _ingested_at
+            description: "Timestamp de ingestion del registro"
+          - name: _source_system
+            description: "Sistema fuente"
+          - name: _source_entity
+            description: "Entidad fuente"
+          - name: _pipeline_name
+            description: "Nombre del pipeline de ingestion"
+          - name: _batch_id
+            description: "ID del lote de carga"
+          - name: _raw_hash
+            description: "Hash SHA2_256 del registro raw para deteccion de cambios"
+          - name: _is_deleted
+            description: "Flag de borrado logico (1 = eliminado)"
+
+      - name: addresses
+        description: "Tabla de direcciones de clientes."
+        freshness:
+          warn_after: { count: 1, period: day }
+          error_after: { count: 3, period: day }
+        loaded_at_field: _ingested_at
+        columns:
+          - name: address_id
+            description: "Identificador unico de la direccion"
+            tests:
+              - not_null
+              - unique
+          - name: customer_id
+            description: "FK al cliente"
+          - name: address_line1
+            description: "Primera linea de direccion"
+          - name: address_line2
+            description: "Segunda linea de direccion (opcional)"
+          - name: city
+            description: "Ciudad"
+          - name: state_province_id
+            description: "FK a estado/provincia"
+          - name: postal_code
+            description: "Codigo postal"
+          - name: country_region
+            description: "Pais o region"
+          - name: _ingested_at
+            description: "Timestamp de ingestion del registro"
+          - name: _is_deleted
+            description: "Flag de borrado logico (1 = eliminado)"

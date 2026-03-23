@@ -1,0 +1,62 @@
+version: 2
+
+sources:
+  - name: raw_hr
+    description: >
+      Datos de RRHH cargados en la landing zone de SQL Server.
+      Contiene informacion de empleados y departamentos.
+    database: dbt_cibao_raw
+    schema: raw_hr
+    tables:
+
+      - name: employees
+        description: "Tabla de empleados con informacion personal, laboral y de compensacion."
+        freshness:
+          warn_after: { count: 1, period: day }
+          error_after: { count: 3, period: day }
+        loaded_at_field: _ingested_at
+        columns:
+          - name: business_entity_id
+            description: "Identificador unico del empleado"
+          - name: national_id_number
+            description: "Numero de identificacion nacional"
+          - name: login_id
+            description: "Identificador de login en el sistema"
+          - name: job_title
+            description: "Titulo o cargo del empleado"
+          - name: birth_date
+            description: "Fecha de nacimiento"
+          - name: marital_status
+            description: "Estado civil (M=Married, S=Single)"
+          - name: gender
+            description: "Genero (M=Male, F=Female)"
+          - name: hire_date
+            description: "Fecha de contratacion"
+          - name: salaried_flag
+            description: "Flag de empleado asalariado (1) vs por hora (0)"
+          - name: vacation_hours
+            description: "Horas de vacaciones acumuladas"
+          - name: sick_leave_hours
+            description: "Horas de licencia por enfermedad acumuladas"
+          - name: _ingested_at
+            description: "Timestamp de ingestion del registro"
+          - name: _is_deleted
+            description: "Flag de borrado logico"
+
+      - name: departments
+        description: "Catalogo de departamentos de la empresa."
+        freshness:
+          warn_after: { count: 7, period: day }
+          error_after: { count: 30, period: day }
+        loaded_at_field: _ingested_at
+        columns:
+          - name: department_id
+            description: "Identificador unico del departamento"
+          - name: name
+            description: "Nombre del departamento"
+          - name: group_name
+            description: "Grupo funcional al que pertenece el departamento"
+          - name: _ingested_at
+            description: "Timestamp de ingestion del registro"
+          - name: _is_deleted
+            description: "Flag de borrado logico"

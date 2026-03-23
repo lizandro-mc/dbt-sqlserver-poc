@@ -1,0 +1,70 @@
+name: dbt_sqlserver_poc
+version: "1.0.0"
+config-version: 2
+
+profile: dbt_sqlserver_poc
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Variables globales del proyecto
+# Se acceden con {{ var('nombre_variable') }} en modelos y macros
+vars:
+  # Ambiente activo (dev, staging, prod)
+  env: dev
+  # Fecha de inicio para filtros historicos (util en modelos incrementales)
+  # Uso: {{ var('start_date') }} en modelos SQL
+  start_date: "2011-01-01"
+
+models:
+  dbt_sqlserver_poc:
+    staging:
+      +materialized: view
+      +schema: stg
+      +tags:
+        - staging
+        - stg
+
+    intermediate:
+      +materialized: view
+      +schema: int
+      +tags:
+        - intermediate
+        - int
+
+    azure:
+      +materialized: table
+      +schema: az
+      +tags:
+        - azure
+        - az
+      facts:
+        +tags:
+          - fact
+      dimensions:
+        +tags:
+          - dimension
+
+# Configuracion de Seeds
+seeds:
+  dbt_sqlserver_poc:
+    +schema: seeds
+    +tags:
+      - seeds
+      - reference
+
+# Configuracion de Snapshots (SCD Type 2)
+snapshots:
+  dbt_sqlserver_poc:
+    +tags:
+      - snapshots
+      - scd_type_2
