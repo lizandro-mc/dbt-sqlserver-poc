@@ -5,6 +5,7 @@ config-version: 2
 profile: dbt_sqlserver_poc
 
 model-paths: ["models"]
+docs-paths: ["docs"]
 analysis-paths: ["analyses"]
 test-paths: ["tests"]
 seed-paths: ["seeds"]

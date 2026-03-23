@@ -82,8 +82,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_crm__customers')
-              field: customer_id
+              arguments:
+                to: ref('stg_crm__customers')
+                field: customer_id
               config:
                 severity: warn
       - name: address_line1
@@ -229,8 +230,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_erp__order_headers')
-              field: sales_order_id
+              arguments:
+                to: ref('stg_erp__order_headers')
+                field: sales_order_id
               config:
                 severity: error
       - name: sales_order_detail_id
@@ -242,8 +244,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_erp__products')
-              field: product_id
+              arguments:
+                to: ref('stg_erp__products')
+                field: product_id
               config:
                 severity: warn
       - name: special_offer_id
