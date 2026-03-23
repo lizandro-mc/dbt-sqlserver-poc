@@ -1,18 +1,5 @@
-/*
-  int_customers
-  -------------
-  Capa Intermedia de clientes — enriquecimiento + seguridad PII.
-
-  Logica aplicada:
-  - Une stg_crm__customers con stg_crm__addresses para enriquecer con datos geograficos.
-  - Limpia nombre (UPPER + LTRIM/RTRIM) y email (LOWER + LTRIM/RTRIM).
-  - Desduplicacion via ROW_NUMBER(): por customer_id, queda la version mas reciente
-    segun _ingested_at.
-  - Genera surrogate key con dbt_utils.generate_surrogate_key.
-  - Hashea campos PII (full_name, email_address, phone) con SHA2_256 para
-    transmision segura hacia la capa Azure Fabric.
-  - Compatible con SQL Server 2016+ (sin TRIM, sin STRING_AGG, sin CONCAT_WS).
-*/
+-- int_customers | stg_crm__customers + stg_crm__addresses -> intermediate
+-- Clientes enriquecidos con direccion, deduplicados, con surrogate key y PII hasheado. Ver doc("int_customers").
 
 WITH customers_raw AS (
     SELECT * FROM {{ ref('stg_crm__customers') }}

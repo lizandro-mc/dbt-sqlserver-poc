@@ -1,15 +1,5 @@
-/*
-  int_orders
-  ----------
-  Capa Intermedia de ordenes — union de cabecera + detalle.
-
-  Logica aplicada:
-  - Une stg_erp__order_headers con stg_erp__order_details (JOIN 1-N).
-  - Calcula campos derivados: line_total_calculated, discount_amount.
-  - Referencia customer_sk de int_customers para trazabilidad hacia dimensiones.
-  - Genera surrogate key por linea de orden.
-  - Compatible con SQL Server 2016+.
-*/
+-- int_orders | stg_erp__order_headers + stg_erp__order_details + int_customers -> intermediate
+-- Ordenes completas (cabecera + detalle) con campos calculados y customer_sk. Ver doc("int_orders").
 
 WITH order_headers AS (
     SELECT * FROM {{ ref('stg_erp__order_headers') }}

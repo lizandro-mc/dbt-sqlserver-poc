@@ -2,40 +2,38 @@ version: 2
 
 sources:
   - name: raw_erp
-    description: >
-      Datos de ERP cargados en la landing zone de SQL Server.
-      Contiene ordenes de venta, detalle de ordenes y catalogo de productos.
+    description: '{{ doc("src_raw_erp") }}'
     database: dbt_cibao_raw
     schema: raw_erp
     tables:
 
       - name: order_headers
-        description: "Cabecera de ordenes de venta con informacion de cliente, fechas y montos totales."
+        description: '{{ doc("src_raw_erp_order_headers") }}'
         freshness:
           warn_after: { count: 1, period: day }
           error_after: { count: 3, period: day }
         loaded_at_field: _ingested_at
         columns:
           - name: sales_order_id
-            description: "Identificador unico de la orden de venta"
+            description: "Identificador único de la orden de venta"
           - name: revision_number
-            description: "Numero de revision de la orden"
+            description: "Número de revisión de la orden"
           - name: order_date
             description: "Fecha de la orden"
           - name: due_date
-            description: "Fecha de vencimiento"
+            description: "Fecha de vencimiento comprometida"
           - name: ship_date
-            description: "Fecha de envio"
+            description: "Fecha de envío"
           - name: status
-            description: "Estado de la orden (1=In Process, 2=Approved, 3=Backordered, 4=Rejected, 5=Shipped, 6=Cancelled)"
+            description: "Estado: 1=In Process, 2=Approved, 3=Backordered, 4=Rejected, 5=Shipped, 6=Cancelled"
           - name: online_order_flag
-            description: "Flag de orden online (1) vs presencial (0)"
+            description: "1=orden online, 0=presencial"
           - name: sales_order_number
-            description: "Numero de orden formateado"
+            description: "Número de orden en formato legible"
           - name: purchase_order_number
-            description: "Numero de orden de compra del cliente"
+            description: "Número de orden de compra del cliente"
           - name: account_number
-            description: "Numero de cuenta"
+            description: "Número de cuenta"
           - name: customer_id
             description: "FK al cliente"
           - name: sales_person_id
@@ -49,14 +47,14 @@ sources:
           - name: freight
             description: "Costo de flete"
           - name: total_due
-            description: "Total a pagar"
+            description: "Total a pagar (sub_total + tax_amt + freight)"
           - name: _ingested_at
-            description: "Timestamp de ingestion del registro"
+            description: '{{ doc("col_ingested_at") }}'
           - name: _is_deleted
-            description: "Flag de borrado logico"
+            description: '{{ doc("col_is_deleted") }}'
 
       - name: order_details
-        description: "Detalle de lineas dentro de cada orden de venta."
+        description: '{{ doc("src_raw_erp_order_details") }}'
         freshness:
           warn_after: { count: 1, period: day }
           error_after: { count: 3, period: day }
@@ -65,56 +63,56 @@ sources:
           - name: sales_order_id
             description: "FK a la cabecera de orden"
           - name: sales_order_detail_id
-            description: "Identificador unico de la linea de detalle"
+            description: "Identificador de la línea dentro de la orden"
           - name: carrier_tracking_number
-            description: "Numero de tracking del transportista"
+            description: "Número de tracking del transportista"
           - name: order_qty
             description: "Cantidad ordenada"
           - name: product_id
             description: "FK al producto"
           - name: special_offer_id
-            description: "FK a oferta especial aplicada"
+            description: "FK a oferta especial aplicada (0 = sin oferta)"
           - name: unit_price
             description: "Precio unitario"
           - name: unit_price_discount
-            description: "Descuento aplicado al precio unitario"
+            description: "Descuento aplicado (0.0 a 1.0)"
           - name: line_total
-            description: "Total de la linea (qty * unit_price * (1 - discount))"
+            description: "Total de línea = qty × price × (1 - discount)"
           - name: _ingested_at
-            description: "Timestamp de ingestion del registro"
+            description: '{{ doc("col_ingested_at") }}'
           - name: _is_deleted
-            description: "Flag de borrado logico"
+            description: '{{ doc("col_is_deleted") }}'
 
       - name: products
-        description: "Catalogo de productos con costos, precios y atributos fisicos."
+        description: '{{ doc("src_raw_erp_products") }}'
         freshness:
           warn_after: { count: 7, period: day }
           error_after: { count: 30, period: day }
         loaded_at_field: _ingested_at
         columns:
           - name: product_id
-            description: "Identificador unico del producto"
+            description: "Identificador único del producto"
           - name: product_number
-            description: "Codigo alfanumerico del producto"
+            description: "Código alfanumérico del producto"
           - name: product_name
             description: "Nombre del producto"
           - name: standard_cost
-            description: "Costo estandar de produccion"
+            description: "Costo estándar de producción"
           - name: list_price
             description: "Precio de lista"
           - name: finished_goods_flag
-            description: "Flag de producto terminado (1) vs componente (0)"
+            description: "1=producto terminado, 0=componente"
           - name: color
             description: "Color del producto"
           - name: safety_stock_level
-            description: "Nivel minimo de stock de seguridad"
+            description: "Nivel mínimo de stock de seguridad"
           - name: reorder_point
             description: "Punto de reorden"
           - name: size
-            description: "Talla o tamano del producto"
+            description: "Talla o tamaño"
           - name: weight
             description: "Peso del producto"
           - name: _ingested_at
-            description: "Timestamp de ingestion del registro"
+            description: '{{ doc("col_ingested_at") }}'
           - name: _is_deleted
-            description: "Flag de borrado logico"
+            description: '{{ doc("col_is_deleted") }}'

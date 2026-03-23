@@ -1,14 +1,5 @@
-/*
-  az_departments
-  --------------
-  Origen : stg_hr__departments  (raw_hr.departments)
-  Destino: Azure Fabric
-
-  Materializacion: incremental / merge
-  - CDC via _raw_hash: solo procesa filas nuevas o modificadas.
-  - pre_hook: elimina filas que ya no existen en la fuente.
-  Sin PII.
-*/
+-- az_departments | raw_hr.departments -> Azure Fabric
+-- incremental/merge · CDC via _raw_hash · sin PII
 
 {{ config(
     unique_key = 'department_id',

@@ -1,16 +1,5 @@
-/*
-  int_employees
-  -------------
-  Capa Intermedia de empleados — enriquecimiento + seguridad PII.
-
-  Logica aplicada:
-  - Toma stg_hr__employees como base.
-  - Desduplicacion via ROW_NUMBER(): por business_entity_id, version mas reciente.
-  - Genera surrogate key con dbt_utils.generate_surrogate_key.
-  - Hashea campos PII sensibles (national_id_number, birth_date, login_id) con SHA2_256
-    para transmision segura hacia la capa Azure Fabric.
-  - Compatible con SQL Server 2016+.
-*/
+-- int_employees | stg_hr__employees -> intermediate
+-- Empleados deduplicados con surrogate key y PII hasheado. Ver doc("int_employees").
 
 WITH employees_raw AS (
     SELECT * FROM {{ ref('stg_hr__employees') }}

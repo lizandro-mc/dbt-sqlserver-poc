@@ -1,14 +1,5 @@
-/*
-  az_orders
-  ---------
-  Tabla certificada para subida a Azure Fabric — ordenes de venta (cabecera + detalle).
-
-  Origen: int_orders (ERP)
-  Granularidad: una fila por linea de orden (sales_order_id + sales_order_detail_id).
-
-  Sin campos PII — las referencias a clientes usan customer_sk (surrogate key anonimizada).
-  Metadata de fuente incluida para trazabilidad end-to-end en Fabric.
-*/
+-- az_orders | int_orders -> Azure Fabric
+-- Ordenes analiticas desnormalizadas (table, full rebuild). Sin PII. Ver doc("az_orders").
 
 WITH source AS (
     SELECT * FROM {{ ref('int_orders') }}

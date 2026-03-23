@@ -2,81 +2,89 @@ version: 2
 
 sources:
   - name: raw_crm
-    description: >
-      Datos de CRM cargados en la landing zone de SQL Server.
-      Contiene informacion de clientes y direcciones ingresada desde el sistema CRM.
+    description: '{{ doc("src_raw_crm") }}'
     database: dbt_cibao_raw
     schema: raw_crm
     tables:
 
       - name: customers
-        description: "Tabla de clientes raw con datos de contacto e identificacion."
+        description: '{{ doc("src_raw_crm_customers") }}'
         freshness:
           warn_after: { count: 1, period: day }
           error_after: { count: 3, period: day }
         loaded_at_field: _ingested_at
         columns:
           - name: customer_id
-            description: "Identificador unico del cliente"
+            description: "Identificador único del cliente"
             tests:
               - not_null
               - unique
           - name: person_id
-            description: "FK a persona en el sistema fuente"
+            description: "FK a persona (clientes individuales)"
           - name: store_id
-            description: "FK a tienda asociada"
+            description: "FK a tienda (clientes corporativos)"
           - name: territory_id
             description: "FK a territorio de ventas"
           - name: account_number
-            description: "Numero de cuenta del cliente"
+            description: "Número de cuenta en el CRM"
           - name: name
-            description: "Nombre del cliente"
+            description: "Nombre del cliente — PII"
+            meta:
+              pii: true
           - name: email_address
-            description: "Direccion de correo electronico"
+            description: "Email del cliente — PII"
+            meta:
+              pii: true
           - name: phone
-            description: "Telefono de contacto"
+            description: "Teléfono del cliente — PII"
+            meta:
+              pii: true
           - name: _ingested_at
-            description: "Timestamp de ingestion del registro"
+            description: '{{ doc("col_ingested_at") }}'
           - name: _source_system
-            description: "Sistema fuente"
+            description: '{{ doc("col_source_system") }}'
           - name: _source_entity
-            description: "Entidad fuente"
+            description: '{{ doc("col_source_entity") }}'
           - name: _pipeline_name
-            description: "Nombre del pipeline de ingestion"
+            description: '{{ doc("col_pipeline_name") }}'
           - name: _batch_id
-            description: "ID del lote de carga"
+            description: '{{ doc("col_batch_id") }}'
           - name: _raw_hash
-            description: "Hash SHA2_256 del registro raw para deteccion de cambios"
+            description: '{{ doc("col_raw_hash") }}'
           - name: _is_deleted
-            description: "Flag de borrado logico (1 = eliminado)"
+            description: '{{ doc("col_is_deleted") }}'
 
       - name: addresses
-        description: "Tabla de direcciones de clientes."
+        description: '{{ doc("src_raw_crm_addresses") }}'
         freshness:
           warn_after: { count: 1, period: day }
           error_after: { count: 3, period: day }
         loaded_at_field: _ingested_at
         columns:
           - name: address_id
-            description: "Identificador unico de la direccion"
+            description: "Identificador único de la dirección"
             tests:
               - not_null
               - unique
           - name: customer_id
             description: "FK al cliente"
           - name: address_line1
-            description: "Primera linea de direccion"
+            description: "Primera línea de dirección — PII"
+            meta:
+              pii: true
           - name: address_line2
-            description: "Segunda linea de direccion (opcional)"
+            description: "Segunda línea de dirección — PII (opcional)"
+            meta:
+              pii: true
           - name: city
             description: "Ciudad"
           - name: state_province_id
             description: "FK a estado/provincia"
           - name: postal_code
-            description: "Codigo postal"
+            description: "Código postal"
           - name: country_region
-            description: "Pais o region"
+            description: "País o región"
           - name: _ingested_at
-            description: "Timestamp de ingestion del registro"
+            description: '{{ doc("col_ingested_at") }}'
           - name: _is_deleted
-            description: "Flag de borrado logico (1 = eliminado)"
+            description: '{{ doc("col_is_deleted") }}'

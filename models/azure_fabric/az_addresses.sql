@@ -1,20 +1,5 @@
-/*
-  az_addresses
-  ------------
-  Origen : stg_crm__addresses  (raw_crm.addresses)
-  Destino: Azure Fabric
-
-  Materializacion: incremental / merge
-  - CDC via _raw_hash: solo procesa filas nuevas o modificadas.
-  - pre_hook: elimina filas que ya no existen en la fuente.
-
-  Politica PII:
-  - address_line1 y address_line2 (direccion fisica) -> solo hashes SHA2_256.
-  - Hashes del valor RAW para coincidir con el vault local.
-
-  customer_sk calculado con generate_surrogate_key(['customer_id']),
-  misma formula que az_customers -> JOIN directo en Fabric sin lookup.
-*/
+-- az_addresses | raw_crm.addresses -> Azure Fabric
+-- incremental/merge · CDC via _raw_hash · address_line1/2 -> hash SHA2_256 (valores RAW)
 
 {{ config(
     unique_key = 'address_id',

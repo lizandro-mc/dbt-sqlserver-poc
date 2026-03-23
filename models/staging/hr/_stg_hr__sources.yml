@@ -2,61 +2,65 @@ version: 2
 
 sources:
   - name: raw_hr
-    description: >
-      Datos de RRHH cargados en la landing zone de SQL Server.
-      Contiene informacion de empleados y departamentos.
+    description: '{{ doc("src_raw_hr") }}'
     database: dbt_cibao_raw
     schema: raw_hr
     tables:
 
       - name: employees
-        description: "Tabla de empleados con informacion personal, laboral y de compensacion."
+        description: '{{ doc("src_raw_hr_employees") }}'
         freshness:
           warn_after: { count: 1, period: day }
           error_after: { count: 3, period: day }
         loaded_at_field: _ingested_at
         columns:
           - name: business_entity_id
-            description: "Identificador unico del empleado"
+            description: "Identificador único del empleado"
           - name: national_id_number
-            description: "Numero de identificacion nacional"
+            description: "Número de identificación nacional — PII"
+            meta:
+              pii: true
           - name: login_id
-            description: "Identificador de login en el sistema"
+            description: "Login de dominio — PII"
+            meta:
+              pii: true
           - name: job_title
-            description: "Titulo o cargo del empleado"
+            description: "Título del cargo"
           - name: birth_date
-            description: "Fecha de nacimiento"
+            description: "Fecha de nacimiento — PII"
+            meta:
+              pii: true
           - name: marital_status
             description: "Estado civil (M=Married, S=Single)"
           - name: gender
-            description: "Genero (M=Male, F=Female)"
+            description: "Género (M=Male, F=Female)"
           - name: hire_date
-            description: "Fecha de contratacion"
+            description: "Fecha de contratación"
           - name: salaried_flag
-            description: "Flag de empleado asalariado (1) vs por hora (0)"
+            description: "1=asalariado, 0=por horas"
           - name: vacation_hours
             description: "Horas de vacaciones acumuladas"
           - name: sick_leave_hours
             description: "Horas de licencia por enfermedad acumuladas"
           - name: _ingested_at
-            description: "Timestamp de ingestion del registro"
+            description: '{{ doc("col_ingested_at") }}'
           - name: _is_deleted
-            description: "Flag de borrado logico"
+            description: '{{ doc("col_is_deleted") }}'
 
       - name: departments
-        description: "Catalogo de departamentos de la empresa."
+        description: '{{ doc("src_raw_hr_departments") }}'
         freshness:
           warn_after: { count: 7, period: day }
           error_after: { count: 30, period: day }
         loaded_at_field: _ingested_at
         columns:
           - name: department_id
-            description: "Identificador unico del departamento"
+            description: "Identificador único del departamento"
           - name: name
             description: "Nombre del departamento"
           - name: group_name
-            description: "Grupo funcional al que pertenece el departamento"
+            description: "Grupo funcional del departamento"
           - name: _ingested_at
-            description: "Timestamp de ingestion del registro"
+            description: '{{ doc("col_ingested_at") }}'
           - name: _is_deleted
-            description: "Flag de borrado logico"
+            description: '{{ doc("col_is_deleted") }}'

@@ -7,56 +7,78 @@ models:
   # ---------------------------------------------------------------------------
 
   - name: stg_crm__customers
-    description: >
-      Capa Staging de clientes de CRM. Renombra y tipifica columnas, filtra
-      registros borrados logicamente. Cada fila es un cliente activo unico.
+    description: '{{ doc("stg_crm__customers") }}'
+    meta:
+      owner: data-engineering
+      source_raw: raw_crm.customers
+      contains_pii: true
+      pii_fields: [name, email_address, phone]
     columns:
       - name: customer_id
-        description: "Identificador unico del cliente (PK)"
+        description: "Identificador único del cliente (PK)"
         tests:
           - not_null
           - unique
       - name: person_id
-        description: "FK a persona en el sistema fuente"
+        description: "FK a persona en el sistema fuente (nulo para cuentas corporativas)"
       - name: store_id
-        description: "FK a tienda asociada"
+        description: "FK a tienda asociada (nulo para clientes individuales)"
       - name: territory_id
         description: "FK a territorio de ventas"
       - name: account_number
-        description: "Numero de cuenta del cliente"
+        description: "Número de cuenta del cliente en el sistema CRM"
         tests:
           - not_null
       - name: name
-        description: "Nombre completo del cliente"
+        description: "Nombre completo del cliente — campo PII, solo en SQL Server local"
         tests:
           - not_null
+        meta:
+          pii: true
       - name: email_address
-        description: "Direccion de correo electronico"
+        description: "Dirección de correo electrónico — campo PII"
+        meta:
+          pii: true
       - name: phone
-        description: "Telefono de contacto"
+        description: "Teléfono de contacto — campo PII"
+        meta:
+          pii: true
       - name: _ingested_at
-        description: "Timestamp de ingestion del registro en la landing zone"
+        description: '{{ doc("col_ingested_at") }}'
         tests:
           - not_null
+      - name: _source_system
+        description: '{{ doc("col_source_system") }}'
+      - name: _source_entity
+        description: '{{ doc("col_source_entity") }}'
+      - name: _pipeline_name
+        description: '{{ doc("col_pipeline_name") }}'
+      - name: _batch_id
+        description: '{{ doc("col_batch_id") }}'
+      - name: _raw_hash
+        description: '{{ doc("col_raw_hash") }}'
       - name: _is_deleted
-        description: "Flag de borrado logico — siempre 0 en esta capa"
+        description: '{{ doc("col_is_deleted") }}'
       - name: _dbt_loaded_at
-        description: "Timestamp de cuando dbt proceso este registro"
+        description: '{{ doc("col_dbt_loaded_at") }}'
         tests:
           - not_null
 
   - name: stg_crm__addresses
-    description: >
-      Capa Staging de direcciones de clientes de CRM. Tipifica y filtra
-      registros borrados. Cada fila es una direccion activa unica.
+    description: '{{ doc("stg_crm__addresses") }}'
+    meta:
+      owner: data-engineering
+      source_raw: raw_crm.addresses
+      contains_pii: true
+      pii_fields: [address_line1, address_line2]
     columns:
       - name: address_id
-        description: "Identificador unico de la direccion (PK)"
+        description: "Identificador único de la dirección (PK)"
         tests:
           - not_null
           - unique
       - name: customer_id
-        description: "FK al cliente propietario de la direccion"
+        description: "FK al cliente propietario de la dirección"
         tests:
           - not_null
           - relationships:
@@ -65,27 +87,43 @@ models:
               config:
                 severity: warn
       - name: address_line1
-        description: "Primera linea de la direccion"
+        description: "Primera línea de la dirección — campo PII (domicilio físico)"
         tests:
           - not_null
+        meta:
+          pii: true
       - name: address_line2
-        description: "Segunda linea de la direccion (puede ser nula)"
+        description: "Segunda línea de la dirección — campo PII (puede ser nula)"
+        meta:
+          pii: true
       - name: city
-        description: "Ciudad"
+        description: "Ciudad — dato geográfico, no PII"
         tests:
           - not_null
       - name: state_province_id
-        description: "FK a estado/provincia"
+        description: "FK a estado o provincia"
       - name: postal_code
-        description: "Codigo postal"
+        description: "Código postal"
       - name: country_region
-        description: "Pais o region"
+        description: "País o región"
       - name: _ingested_at
-        description: "Timestamp de ingestion del registro"
+        description: '{{ doc("col_ingested_at") }}'
         tests:
           - not_null
+      - name: _source_system
+        description: '{{ doc("col_source_system") }}'
+      - name: _source_entity
+        description: '{{ doc("col_source_entity") }}'
+      - name: _pipeline_name
+        description: '{{ doc("col_pipeline_name") }}'
+      - name: _batch_id
+        description: '{{ doc("col_batch_id") }}'
+      - name: _raw_hash
+        description: '{{ doc("col_raw_hash") }}'
+      - name: _is_deleted
+        description: '{{ doc("col_is_deleted") }}'
       - name: _dbt_loaded_at
-        description: "Timestamp de cuando dbt proceso este registro"
+        description: '{{ doc("col_dbt_loaded_at") }}'
         tests:
           - not_null
 
@@ -94,29 +132,43 @@ models:
   # ---------------------------------------------------------------------------
 
   - name: stg_erp__order_headers
-    description: >
-      Capa Staging de cabeceras de ordenes de venta del ERP. Tipifica fechas,
-      montos y flags. Filtra registros borrados logicamente.
+    description: '{{ doc("stg_erp__order_headers") }}'
+    meta:
+      owner: data-engineering
+      source_raw: raw_erp.order_headers
+      contains_pii: false
     columns:
       - name: sales_order_id
-        description: "Identificador unico de la orden de venta (PK)"
+        description: "Identificador único de la orden de venta (PK)"
         tests:
           - not_null
           - unique
       - name: customer_id
-        description: "FK al cliente"
+        description: "FK al cliente — clave entera de sistema, no PII"
         tests:
           - not_null
+      - name: sales_person_id
+        description: "FK al vendedor asignado (puede ser nulo para órdenes online)"
+      - name: territory_id
+        description: "FK al territorio de ventas"
+      - name: revision_number
+        description: "Número de revisión de la orden (se incrementa con cada modificación)"
+      - name: sales_order_number
+        description: "Número de orden en formato legible (ej. SO43659)"
+      - name: purchase_order_number
+        description: "Número de orden de compra proporcionado por el cliente"
+      - name: account_number
+        description: "Número de cuenta asociado a la orden"
       - name: order_date
-        description: "Fecha en que se realizo la orden"
+        description: "Fecha en que se realizó la orden"
         tests:
           - not_null
       - name: due_date
-        description: "Fecha de vencimiento comprometida"
+        description: "Fecha de vencimiento comprometida con el cliente"
       - name: ship_date
-        description: "Fecha real de envio"
+        description: "Fecha real de envío (nula si aún no se envió)"
       - name: status
-        description: "Estado de la orden (1-6)"
+        description: "Estado de la orden: 1=In Process, 2=Approved, 3=Backordered, 4=Rejected, 5=Shipped, 6=Cancelled"
         tests:
           - not_null
           - accepted_values:
@@ -125,38 +177,55 @@ models:
               config:
                 severity: warn
       - name: online_order_flag
-        description: "1 si la orden fue realizada en linea"
-      - name: sales_order_number
-        description: "Numero de orden legible"
+        description: "1 si la orden fue realizada en línea; 0 si fue presencial"
       - name: sub_total
-        description: "Subtotal sin impuestos ni flete"
+        description: "Subtotal de la orden antes de impuestos y flete"
         tests:
           - not_null
+      - name: tax_amt
+        description: "Monto de impuesto calculado"
+      - name: freight
+        description: "Costo de flete"
       - name: total_due
-        description: "Total a cobrar incluyendo impuestos y flete"
+        description: "Total a cobrar: sub_total + tax_amt + freight"
         tests:
           - not_null
       - name: _ingested_at
-        description: "Timestamp de ingestion"
+        description: '{{ doc("col_ingested_at") }}'
         tests:
           - not_null
+      - name: _source_system
+        description: '{{ doc("col_source_system") }}'
+      - name: _source_entity
+        description: '{{ doc("col_source_entity") }}'
+      - name: _pipeline_name
+        description: '{{ doc("col_pipeline_name") }}'
+      - name: _batch_id
+        description: '{{ doc("col_batch_id") }}'
+      - name: _raw_hash
+        description: '{{ doc("col_raw_hash") }}'
+      - name: _is_deleted
+        description: '{{ doc("col_is_deleted") }}'
       - name: _dbt_loaded_at
-        description: "Timestamp de procesamiento dbt"
+        description: '{{ doc("col_dbt_loaded_at") }}'
         tests:
           - not_null
 
   - name: stg_erp__order_details
-    description: >
-      Capa Staging de lineas de detalle de ordenes del ERP. Cada fila representa
-      un producto dentro de una orden de venta.
+    description: '{{ doc("stg_erp__order_details") }}'
+    meta:
+      owner: data-engineering
+      source_raw: raw_erp.order_details
+      contains_pii: false
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - sales_order_id
-            - sales_order_detail_id
+          arguments:
+            combination_of_columns:
+              - sales_order_id
+              - sales_order_detail_id
     columns:
       - name: sales_order_id
-        description: "FK a la cabecera de orden"
+        description: "FK a la cabecera de orden (parte de la clave compuesta)"
         tests:
           - not_null
           - relationships:
@@ -165,7 +234,7 @@ models:
               config:
                 severity: error
       - name: sales_order_detail_id
-        description: "Identificador unico de la linea de detalle (PK junto con sales_order_id)"
+        description: "Identificador de la línea dentro de la orden (parte de la clave compuesta)"
         tests:
           - not_null
       - name: product_id
@@ -177,65 +246,99 @@ models:
               field: product_id
               config:
                 severity: warn
+      - name: special_offer_id
+        description: "FK a la oferta especial aplicada (0 si no hay oferta)"
+      - name: carrier_tracking_number
+        description: "Número de tracking del transportista (nulo antes del envío)"
       - name: order_qty
-        description: "Cantidad de unidades ordenadas"
+        description: "Cantidad de unidades ordenadas para este producto"
         tests:
           - not_null
       - name: unit_price
-        description: "Precio unitario sin descuento"
+        description: "Precio unitario del producto en esta orden"
         tests:
           - not_null
       - name: unit_price_discount
-        description: "Porcentaje de descuento sobre el precio unitario"
+        description: "Porcentaje de descuento sobre el precio unitario (0.0 a 1.0)"
       - name: line_total
-        description: "Total de la linea calculado"
+        description: "Total de la línea: order_qty × unit_price × (1 - unit_price_discount)"
         tests:
           - not_null
       - name: _ingested_at
-        description: "Timestamp de ingestion"
+        description: '{{ doc("col_ingested_at") }}'
         tests:
           - not_null
+      - name: _source_system
+        description: '{{ doc("col_source_system") }}'
+      - name: _source_entity
+        description: '{{ doc("col_source_entity") }}'
+      - name: _pipeline_name
+        description: '{{ doc("col_pipeline_name") }}'
+      - name: _batch_id
+        description: '{{ doc("col_batch_id") }}'
+      - name: _raw_hash
+        description: '{{ doc("col_raw_hash") }}'
+      - name: _is_deleted
+        description: '{{ doc("col_is_deleted") }}'
       - name: _dbt_loaded_at
-        description: "Timestamp de procesamiento dbt"
+        description: '{{ doc("col_dbt_loaded_at") }}'
         tests:
           - not_null
 
   - name: stg_erp__products
-    description: >
-      Capa Staging del catalogo de productos del ERP. Incluye precios, costos
-      y atributos fisicos del producto.
+    description: '{{ doc("stg_erp__products") }}'
+    meta:
+      owner: data-engineering
+      source_raw: raw_erp.products
+      contains_pii: false
     columns:
       - name: product_id
-        description: "Identificador unico del producto (PK)"
+        description: "Identificador único del producto (PK)"
         tests:
           - not_null
           - unique
       - name: product_number
-        description: "Codigo alfanumerico del producto"
+        description: "Código alfanumérico del producto (ej. BK-R93R-62)"
         tests:
           - not_null
       - name: product_name
-        description: "Nombre del producto"
+        description: "Nombre descriptivo del producto"
         tests:
           - not_null
       - name: standard_cost
-        description: "Costo estandar de produccion"
+        description: "Costo estándar de fabricación o adquisición"
       - name: list_price
-        description: "Precio de lista al publico"
+        description: "Precio de lista al público (0 si es componente sin precio de venta)"
       - name: finished_goods_flag
-        description: "1 si es producto terminado; 0 si es componente"
+        description: "1 si es producto terminado para venta; 0 si es componente o materia prima"
       - name: color
-        description: "Color del producto (puede ser nulo)"
+        description: "Color del producto (nulo si no aplica)"
       - name: size
-        description: "Talla o tamano"
+        description: "Talla o tamaño del producto (nulo si no aplica)"
       - name: weight
-        description: "Peso en la unidad definida por el sistema fuente"
+        description: "Peso del producto en la unidad definida por el sistema fuente (nulo si no aplica)"
+      - name: safety_stock_level
+        description: "Nivel mínimo de stock de seguridad antes de activar reabastecimiento"
+      - name: reorder_point
+        description: "Punto de inventario en que se genera una orden de reabastecimiento"
       - name: _ingested_at
-        description: "Timestamp de ingestion"
+        description: '{{ doc("col_ingested_at") }}'
         tests:
           - not_null
+      - name: _source_system
+        description: '{{ doc("col_source_system") }}'
+      - name: _source_entity
+        description: '{{ doc("col_source_entity") }}'
+      - name: _pipeline_name
+        description: '{{ doc("col_pipeline_name") }}'
+      - name: _batch_id
+        description: '{{ doc("col_batch_id") }}'
+      - name: _raw_hash
+        description: '{{ doc("col_raw_hash") }}'
+      - name: _is_deleted
+        description: '{{ doc("col_is_deleted") }}'
       - name: _dbt_loaded_at
-        description: "Timestamp de procesamiento dbt"
+        description: '{{ doc("col_dbt_loaded_at") }}'
         tests:
           - not_null
 
@@ -244,29 +347,38 @@ models:
   # ---------------------------------------------------------------------------
 
   - name: stg_hr__employees
-    description: >
-      Capa Staging de empleados del sistema de RRHH. Incluye datos personales
-      y laborales. Filtra registros borrados.
+    description: '{{ doc("stg_hr__employees") }}'
+    meta:
+      owner: data-engineering
+      source_raw: raw_hr.employees
+      contains_pii: true
+      pii_fields: [national_id_number, login_id, birth_date]
     columns:
       - name: business_entity_id
-        description: "Identificador unico del empleado (PK)"
+        description: "Identificador único del empleado (PK)"
         tests:
           - not_null
           - unique
       - name: national_id_number
-        description: "Numero de identificacion nacional"
+        description: "Número de identificación nacional — campo PII"
         tests:
           - not_null
+        meta:
+          pii: true
       - name: login_id
-        description: "ID de login en el dominio"
+        description: "Identificador de login en el dominio (ej. adventure-works\\\\jdoe) — campo PII"
+        meta:
+          pii: true
       - name: job_title
-        description: "Titulo del cargo"
+        description: "Título del cargo del empleado"
         tests:
           - not_null
       - name: birth_date
-        description: "Fecha de nacimiento"
+        description: "Fecha de nacimiento — campo PII"
+        meta:
+          pii: true
       - name: marital_status
-        description: "Estado civil (M/S)"
+        description: "Estado civil: M=Married, S=Single"
         tests:
           - accepted_values:
               arguments:
@@ -274,7 +386,7 @@ models:
               config:
                 severity: warn
       - name: gender
-        description: "Genero (M/F)"
+        description: "Género: M=Male, F=Female"
         tests:
           - accepted_values:
               arguments:
@@ -282,46 +394,73 @@ models:
               config:
                 severity: warn
       - name: hire_date
-        description: "Fecha de contratacion"
+        description: "Fecha de contratación del empleado"
         tests:
           - not_null
       - name: salaried_flag
-        description: "1 si el empleado es asalariado"
+        description: "1 si el empleado es asalariado; 0 si cobra por horas"
       - name: vacation_hours
-        description: "Horas de vacaciones disponibles"
+        description: "Horas de vacaciones disponibles acumuladas"
       - name: sick_leave_hours
-        description: "Horas de licencia por enfermedad disponibles"
+        description: "Horas de licencia por enfermedad disponibles acumuladas"
       - name: _ingested_at
-        description: "Timestamp de ingestion"
+        description: '{{ doc("col_ingested_at") }}'
         tests:
           - not_null
+      - name: _source_system
+        description: '{{ doc("col_source_system") }}'
+      - name: _source_entity
+        description: '{{ doc("col_source_entity") }}'
+      - name: _pipeline_name
+        description: '{{ doc("col_pipeline_name") }}'
+      - name: _batch_id
+        description: '{{ doc("col_batch_id") }}'
+      - name: _raw_hash
+        description: '{{ doc("col_raw_hash") }}'
+      - name: _is_deleted
+        description: '{{ doc("col_is_deleted") }}'
       - name: _dbt_loaded_at
-        description: "Timestamp de procesamiento dbt"
+        description: '{{ doc("col_dbt_loaded_at") }}'
         tests:
           - not_null
 
   - name: stg_hr__departments
-    description: >
-      Capa Staging del catalogo de departamentos del sistema de RRHH.
+    description: '{{ doc("stg_hr__departments") }}'
+    meta:
+      owner: data-engineering
+      source_raw: raw_hr.departments
+      contains_pii: false
     columns:
       - name: department_id
-        description: "Identificador unico del departamento (PK)"
+        description: "Identificador único del departamento (PK)"
         tests:
           - not_null
           - unique
       - name: name
-        description: "Nombre del departamento"
+        description: "Nombre del departamento (ej. Engineering, Sales)"
         tests:
           - not_null
       - name: group_name
-        description: "Grupo funcional al que pertenece el departamento"
+        description: "Grupo funcional al que pertenece el departamento (ej. Research and Development)"
         tests:
           - not_null
       - name: _ingested_at
-        description: "Timestamp de ingestion"
+        description: '{{ doc("col_ingested_at") }}'
         tests:
           - not_null
+      - name: _source_system
+        description: '{{ doc("col_source_system") }}'
+      - name: _source_entity
+        description: '{{ doc("col_source_entity") }}'
+      - name: _pipeline_name
+        description: '{{ doc("col_pipeline_name") }}'
+      - name: _batch_id
+        description: '{{ doc("col_batch_id") }}'
+      - name: _raw_hash
+        description: '{{ doc("col_raw_hash") }}'
+      - name: _is_deleted
+        description: '{{ doc("col_is_deleted") }}'
       - name: _dbt_loaded_at
-        description: "Timestamp de procesamiento dbt"
+        description: '{{ doc("col_dbt_loaded_at") }}'
         tests:
           - not_null

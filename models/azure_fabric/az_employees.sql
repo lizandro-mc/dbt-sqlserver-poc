@@ -1,17 +1,5 @@
-/*
-  az_employees
-  ------------
-  Origen : stg_hr__employees  (raw_hr.employees)
-  Destino: Azure Fabric
-
-  Materializacion: incremental / merge
-  - CDC via _raw_hash: solo procesa filas nuevas o modificadas.
-  - pre_hook: elimina filas que ya no existen en la fuente.
-
-  Politica PII:
-  - national_id_number, login_id, birth_date -> solo hashes SHA2_256.
-  - Hashes del valor RAW para coincidir con int_pii_vault_employees.
-*/
+-- az_employees | raw_hr.employees -> Azure Fabric
+-- incremental/merge · CDC via _raw_hash · national_id/login/birth_date -> hash SHA2_256 (valores RAW)
 
 {{ config(
     unique_key = 'business_entity_id',

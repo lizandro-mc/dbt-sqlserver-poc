@@ -1,14 +1,5 @@
-/*
-  az_order_details
-  ----------------
-  Origen : stg_erp__order_details  (raw_erp.order_details)
-  Destino: Azure Fabric
-
-  Materializacion: incremental / merge  (unique_key compuesta)
-  - CDC via _raw_hash: solo procesa filas nuevas o modificadas.
-  - pre_hook: elimina filas que ya no existen en la fuente (clave compuesta).
-  Sin PII.
-*/
+-- az_order_details | raw_erp.order_details -> Azure Fabric
+-- incremental/merge · CDC via _raw_hash · PK compuesta (sales_order_id, sales_order_detail_id)
 
 {{ config(
     unique_key          = ['sales_order_id', 'sales_order_detail_id'],

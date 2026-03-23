@@ -1,14 +1,5 @@
-/*
-  az_products
-  -----------
-  Origen : stg_erp__products  (raw_erp.products)
-  Destino: Azure Fabric
-
-  Materializacion: incremental / merge
-  - CDC via _raw_hash: solo procesa filas nuevas o modificadas.
-  - pre_hook: elimina filas que ya no existen en la fuente.
-  Sin PII.
-*/
+-- az_products | raw_erp.products -> Azure Fabric
+-- incremental/merge · CDC via _raw_hash · sin PII
 
 {{ config(
     unique_key = 'product_id',

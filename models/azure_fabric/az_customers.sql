@@ -1,22 +1,5 @@
-/*
-  az_customers
-  ------------
-  Origen : stg_crm__customers  (raw_crm.customers)
-  Destino: Azure Fabric
-
-  Materializacion: incremental / merge
-  - CDC via _raw_hash: solo procesa filas nuevas o modificadas.
-  - pre_hook: elimina filas que ya no existen en la fuente (borrado logico
-    ya filtrado en staging; borrado fisico del mirror cubierto aqui).
-  - Full-refresh manual: dbt run --full-refresh --select az_customers
-
-  Politica PII:
-  - name, email_address, phone -> solo hashes SHA2_256 expuestos.
-  - Hashes calculados del valor RAW (sin normalizacion) para que coincidan
-    con int_pii_vault_customers y permitan verificacion cruzada.
-
-  Nota: datos geograficos (direccion) estan en az_addresses.
-*/
+-- az_customers | raw_crm.customers -> Azure Fabric
+-- incremental/merge · CDC via _raw_hash · name/email/phone -> hash SHA2_256 (valores RAW)
 
 {{ config(
     unique_key = 'customer_id',

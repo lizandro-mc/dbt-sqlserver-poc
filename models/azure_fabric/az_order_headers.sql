@@ -1,17 +1,5 @@
-/*
-  az_order_headers
-  ----------------
-  Origen : stg_erp__order_headers  (raw_erp.order_headers)
-  Destino: Azure Fabric
-
-  Materializacion: incremental / merge
-  - CDC via _raw_hash: solo procesa filas nuevas o modificadas.
-  - pre_hook: elimina filas que ya no existen en la fuente.
-
-  customer_sk calculado inline con generate_surrogate_key(['customer_id']),
-  misma formula que az_customers -> JOIN directo en Fabric sin lookup adicional.
-  Sin PII (customer_id es clave entera de sistema, no dato personal).
-*/
+-- az_order_headers | raw_erp.order_headers -> Azure Fabric
+-- incremental/merge · CDC via _raw_hash · sin PII · customer_sk inline
 
 {{ config(
     unique_key = 'sales_order_id',
