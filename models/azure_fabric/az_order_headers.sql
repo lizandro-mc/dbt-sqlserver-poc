@@ -1,68 +1,81 @@
 /*
   az_order_headers
   ----------------
-  Tabla certificada para subida a Azure Fabric — cabeceras de ordenes de venta.
+  Origen : stg_erp__order_headers  (raw_erp.order_headers)
+  Destino: Azure Fabric
 
-  Origen: stg_erp__order_headers (ERP)
-  Granularidad: un registro por orden de venta (sales_order_id unico).
+  Materializacion: incremental / merge
+  - CDC via _raw_hash: solo procesa filas nuevas o modificadas.
+  - pre_hook: elimina filas que ya no existen en la fuente.
 
-  Sin datos PII. El customer_id es una clave de negocio (entero, no dato personal).
-  Se agrega customer_sk (via int_customers) para facilitar joins en Fabric
-  sin necesidad de exponer logica de negocio del CRM.
+  customer_sk calculado inline con generate_surrogate_key(['customer_id']),
+  misma formula que az_customers -> JOIN directo en Fabric sin lookup adicional.
+  Sin PII (customer_id es clave entera de sistema, no dato personal).
 */
 
-WITH order_headers AS (
+{{ config(
+    unique_key = 'sales_order_id',
+    pre_hook   = "{% if is_incremental() %} DELETE FROM {{ this }} WHERE sales_order_id NOT IN (SELECT sales_order_id FROM {{ ref('stg_erp__order_headers') }}) {% endif %}"
+) }}
+
+WITH source AS (
     SELECT * FROM {{ ref('stg_erp__order_headers') }}
 ),
 
--- Traer solo la surrogate key del cliente para enriquecer la cabecera
-customers AS (
+{% if is_incremental() %}
+changed AS (
+    SELECT s.*
+    FROM source             AS s
+    LEFT JOIN {{ this }}    AS t  ON s.sales_order_id = t.sales_order_id
+    WHERE t.sales_order_id IS NULL
+       OR s._raw_hash <> t._raw_hash
+),
+{% else %}
+changed AS (SELECT * FROM source),
+{% endif %}
+
+final AS (
     SELECT
+        -- Clave primaria
+        sales_order_id,
+
+        -- Claves foraneas
         customer_id,
-        customer_sk
-    FROM {{ ref('int_customers') }}
+        {{ dbt_utils.generate_surrogate_key(['customer_id']) }}     AS customer_sk,
+        sales_person_id,
+        territory_id,
+
+        -- Identificadores de la orden
+        revision_number,
+        sales_order_number,
+        purchase_order_number,
+        account_number,
+
+        -- Fechas
+        order_date,
+        due_date,
+        ship_date,
+
+        -- Estado y canal
+        status,
+        online_order_flag,
+
+        -- Montos financieros
+        sub_total,
+        tax_amt,
+        freight,
+        total_due,
+
+        -- Metadata de fuente
+        _ingested_at,
+        _source_system,
+        _source_entity,
+        _pipeline_name,
+        _batch_id,
+        _raw_hash,
+        CURRENT_TIMESTAMP                                           AS _dbt_loaded_at
+
+    FROM changed
 )
 
-SELECT
-    -- Clave primaria
-    h.sales_order_id,
-
-    -- Claves foraneas
-    h.customer_id,
-    c.customer_sk,              -- Surrogate key para joins en Fabric
-    h.sales_person_id,
-    h.territory_id,
-
-    -- Identificadores de la orden
-    h.revision_number,
-    h.sales_order_number,
-    h.purchase_order_number,
-    h.account_number,
-
-    -- Fechas
-    h.order_date,
-    h.due_date,
-    h.ship_date,
-
-    -- Estado y canal
-    h.status,
-    h.online_order_flag,
-
-    -- Montos financieros
-    h.sub_total,
-    h.tax_amt,
-    h.freight,
-    h.total_due,
-
-    -- Metadata de fuente para trazabilidad
-    h._ingested_at,
-    h._source_system,
-    h._source_entity,
-    h._pipeline_name,
-    h._batch_id,
-    h._raw_hash,
-    h._dbt_loaded_at
-
-FROM order_headers AS h
-LEFT JOIN customers AS c
-    ON h.customer_id = c.customer_id
+SELECT * FROM final

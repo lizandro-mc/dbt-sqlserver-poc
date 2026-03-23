@@ -7,6 +7,9 @@
   Permite recuperar los datos personales de un empleado a partir de cualquier
   clave que se tenga desde la capa Azure Fabric.
 
+  Fuente: stg_hr__employees (valores RAW — mismos que az_employees usa para
+  calcular los hashes). Los hashes aqui son identicos a los de az_employees.
+
   =========================================================
   COMO USAR: recuperar PII desde Azure
   =========================================================
@@ -33,7 +36,8 @@
     az_employees                     int_pii_vault_employees
       employee_sk    ─────────────►    employee_sk
       business_entity_id ─────────►   business_entity_id
-      national_id_hash ◄─ verifica ─  national_id_hash
+      national_id_hash ◄─ verifica ─  national_id_hash (hash del mismo valor RAW)
+      login_id_hash    ◄─ verifica ─  login_id_hash
       birth_date_hash  ◄─ verifica ─  birth_date_hash
                                        national_id_number ← PII en claro
                                        login_id           ← PII en claro
@@ -41,12 +45,12 @@
 */
 
 WITH source AS (
-    SELECT * FROM {{ ref('int_employees') }}
+    SELECT * FROM {{ ref('stg_hr__employees') }}
 )
 
 SELECT
     -- === CLAVES DE VINCULACION (iguales a las que estan en Azure) ===
-    employee_sk,
+    {{ dbt_utils.generate_surrogate_key(['business_entity_id']) }}  AS employee_sk,
     business_entity_id,
 
     -- === PII EN CLARO (SOLO disponible en SQL Server local) ===
@@ -54,10 +58,11 @@ SELECT
     login_id,
     birth_date,
 
-    -- === HASHES (para verificacion cruzada con Azure sin exponer PII) ===
-    national_id_hash,
-    login_id_hash,
-    birth_date_hash,
+    -- === HASHES (para verificacion cruzada con Azure sin exponer PII)
+    --     Calculados sobre los valores RAW — identicos a az_employees ===
+    CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(national_id_number AS NVARCHAR(MAX)), '')), 2) AS national_id_hash,
+    CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(login_id           AS NVARCHAR(MAX)), '')), 2) AS login_id_hash,
+    CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(CONVERT(VARCHAR(10), birth_date, 120) AS NVARCHAR(MAX)), '')), 2) AS birth_date_hash,
 
     -- === Datos laborales (non-PII, igual que en Azure) ===
     job_title,

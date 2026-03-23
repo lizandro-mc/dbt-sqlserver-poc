@@ -253,10 +253,11 @@ models:
   - name: int_pii_vault_customers
     description: >
       MODELO LOCAL RESTRINGIDO. Nunca subir a Azure ni a Fabric.
-      Boveda de PII de clientes. Vincula las claves de Azure
-      (customer_sk, customer_id) con los datos personales en claro.
+      Boveda de PII de clientes. Fuente: stg_crm__customers (valores RAW).
+      Los hashes son identicos a los de az_customers (misma fuente, mismo algoritmo).
       Uso: dado un customer_sk de Azure Fabric, consultar aqui para
-      recuperar nombre, email, telefono y direccion fisica.
+      recuperar nombre, email y telefono en claro.
+      Datos de direccion fisica: ver int_pii_vault_addresses (az_addresses).
     meta:
       access: restricted
       environment: local_only
@@ -272,8 +273,8 @@ models:
         tests:
           - not_null
           - unique
-      - name: full_name
-        description: "[PII] Nombre completo en claro"
+      - name: name
+        description: "[PII] Nombre del cliente en claro (valor RAW de stg_crm__customers)"
         meta: { pii: true }
       - name: email_address
         description: "[PII] Email en claro"
@@ -281,22 +282,16 @@ models:
       - name: phone
         description: "[PII] Telefono en claro"
         meta: { pii: true }
-      - name: address_line1
-        description: "[PII] Primera linea de direccion fisica en claro"
-        meta: { pii: true }
-      - name: address_line2
-        description: "[PII] Segunda linea de direccion fisica en claro"
-        meta: { pii: true }
       - name: full_name_hash
-        description: "Hash SHA2_256 — verificacion cruzada con az_customers.full_name_hash"
+        description: "Hash SHA2_256 del campo name RAW — identico a az_customers.full_name_hash"
         tests:
           - not_null
       - name: email_address_hash
-        description: "Hash SHA2_256 — verificacion cruzada con az_customers.email_address_hash"
+        description: "Hash SHA2_256 — identico a az_customers.email_address_hash"
         tests:
           - not_null
       - name: phone_hash
-        description: "Hash SHA2_256 — verificacion cruzada con az_customers.phone_hash"
+        description: "Hash SHA2_256 — identico a az_customers.phone_hash"
 
   # ---------------------------------------------------------------------------
   # int_pii_vault_employees — RESTRINGIDO — solo SQL Server local

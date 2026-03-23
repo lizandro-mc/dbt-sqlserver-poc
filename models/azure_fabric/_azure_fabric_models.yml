@@ -31,6 +31,7 @@ models:
     description: >
       Clientes normalizados y seguros para Azure Fabric.
       PII (nombre, email, telefono) sustituido por hashes SHA2_256.
+      Datos geograficos en az_addresses (tabla independiente).
       Granularidad: un registro por cliente activo.
     meta:
       owner: data-engineering
@@ -81,16 +82,6 @@ models:
           pii: false
           original_field: phone
           hash_algorithm: SHA2_256
-      - name: city
-        description: "Ciudad del cliente (dato geografico, no PII)."
-        tests:
-          - not_null
-      - name: state_province_id
-        description: "FK a estado o provincia."
-      - name: postal_code
-        description: "Codigo postal."
-      - name: country_region
-        description: "Pais o region."
       - name: _ingested_at
         description: "Timestamp de ingestion en landing zone."
         tests:

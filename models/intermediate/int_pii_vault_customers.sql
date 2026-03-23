@@ -7,6 +7,9 @@
   Permite recuperar los datos personales de un cliente a partir de cualquier
   clave que se tenga desde la capa Azure Fabric.
 
+  Fuente: stg_crm__customers (valores RAW — mismos que az_customers usa para
+  calcular los hashes). Los hashes aqui son identicos a los de az_customers.
+
   =========================================================
   COMO USAR: recuperar PII desde Azure
   =========================================================
@@ -34,39 +37,33 @@
     az_customers                     int_pii_vault_customers
       customer_sk  ──────────────►     customer_sk
       customer_id  ──────────────►     customer_id
-      full_name_hash ◄── verifica ──   full_name_hash
-                                       full_name          ← PII en claro
+      full_name_hash ◄── verifica ──   full_name_hash (hash del mismo valor RAW)
+      email_address_hash ◄─ verif ──   email_address_hash
+                                       name               ← PII en claro
                                        email_address      ← PII en claro
                                        phone              ← PII en claro
 */
 
 WITH source AS (
-    SELECT * FROM {{ ref('int_customers') }}
+    SELECT * FROM {{ ref('stg_crm__customers') }}
 )
 
 SELECT
     -- === CLAVES DE VINCULACION (iguales a las que estan en Azure) ===
-    customer_sk,
+    {{ dbt_utils.generate_surrogate_key(['customer_id']) }}     AS customer_sk,
     customer_id,
     account_number,
 
     -- === PII EN CLARO (SOLO disponible en SQL Server local) ===
-    full_name,
+    name,
     email_address,
     phone,
-    address_line1,
-    address_line2,
 
-    -- === HASHES (para verificacion cruzada con Azure sin exponer PII) ===
-    full_name_hash,
-    email_address_hash,
-    phone_hash,
-
-    -- === Datos geograficos (non-PII, igual que en Azure) ===
-    city,
-    state_province_id,
-    postal_code,
-    country_region,
+    -- === HASHES (para verificacion cruzada con Azure sin exponer PII)
+    --     Calculados sobre los valores RAW — identicos a az_customers ===
+    CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(name          AS NVARCHAR(MAX)), '')), 2) AS full_name_hash,
+    CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(email_address AS NVARCHAR(MAX)), '')), 2) AS email_address_hash,
+    CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(phone         AS NVARCHAR(MAX)), '')), 2) AS phone_hash,
 
     -- === Auditoria ===
     _ingested_at,

@@ -53,11 +53,16 @@ models:
           - local_only
 
     azure_fabric:
-      +materialized: table
+      +materialized: incremental
+      +incremental_strategy: merge
+      +on_schema_change: sync_all_columns
       +schema: azure_fabric
       +tags:
         - azure
         - az
+      # az_orders es un join analitico de varias fuentes — se rebuild completo
+      az_orders:
+        +materialized: table
 
 # Configuracion de Seeds
 seeds:
