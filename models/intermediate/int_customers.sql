@@ -1,7 +1,7 @@
 /*
-  slv_customers
+  int_customers
   -------------
-  Capa Silver de clientes.
+  Capa Intermedia de clientes — enriquecimiento + seguridad PII.
 
   Logica aplicada:
   - Une stg_crm__customers con stg_crm__addresses para enriquecer con datos geograficos.
@@ -9,6 +9,8 @@
   - Desduplicacion via ROW_NUMBER(): por customer_id, queda la version mas reciente
     segun _ingested_at.
   - Genera surrogate key con dbt_utils.generate_surrogate_key.
+  - Hashea campos PII (full_name, email_address, phone) con SHA2_256 para
+    transmision segura hacia la capa Azure Fabric.
   - Compatible con SQL Server 2016+ (sin TRIM, sin STRING_AGG, sin CONCAT_WS).
 */
 
@@ -99,9 +101,18 @@ final AS (
         store_id,
         territory_id,
         account_number,
+
+        -- Campos PII en claro (uso interno — NO exponer en Azure Fabric)
         full_name,
         email_address,
         phone,
+
+        -- Campos PII hasheados SHA2_256 (uso en capas publicas / cloud)
+        CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(full_name      AS NVARCHAR(MAX)), '')), 2) AS full_name_hash,
+        CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(email_address  AS NVARCHAR(MAX)), '')), 2) AS email_address_hash,
+        CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', ISNULL(CAST(phone          AS NVARCHAR(MAX)), '')), 2) AS phone_hash,
+
+        -- Datos geograficos (no PII)
         address_line1,
         address_line2,
         city,

@@ -1,0 +1,704 @@
+version: 2
+
+# =============================================================================
+# DATA CONTRACTS — Capa Azure Fabric (az_)
+#
+# Una tabla az_ por cada tabla raw. Contratos visados.
+# PII: NUNCA se exponen campos en claro — solo hashes SHA2_256.
+# Toda tabla incluye metadata completa de trazabilidad de fuente.
+#
+# Mapa raw -> az_:
+#   raw_crm.customers     -> az_customers
+#   raw_crm.addresses     -> az_addresses
+#   raw_erp.order_headers -> az_order_headers
+#   raw_erp.order_details -> az_order_details
+#   raw_erp.products      -> az_products
+#   raw_hr.employees      -> az_employees
+#   raw_hr.departments    -> az_departments
+#   (tabla analitica)     -> az_orders
+#
+# Para recuperar PII desde Azure usar los vaults locales:
+#   int_pii_vault_customers  (customer_sk / customer_id)
+#   int_pii_vault_employees  (employee_sk / business_entity_id)
+# =============================================================================
+
+models:
+
+  # ---------------------------------------------------------------------------
+  # az_customers — raw_crm.customers
+  # ---------------------------------------------------------------------------
+  - name: az_customers
+    description: >
+      Clientes normalizados y seguros para Azure Fabric.
+      PII (nombre, email, telefono) sustituido por hashes SHA2_256.
+      Granularidad: un registro por cliente activo.
+    meta:
+      owner: data-engineering
+      source_raw: raw_crm.customers
+      pii_free: true
+      contract_status: visado
+      pii_vault: int_pii_vault_customers
+    columns:
+      - name: customer_sk
+        description: "Surrogate key del cliente (PK). FK desde az_addresses, az_order_headers."
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "Clave de negocio del cliente (sistema fuente)."
+        tests:
+          - not_null
+          - unique
+      - name: account_number
+        description: "Numero de cuenta del cliente."
+        tests:
+          - not_null
+      - name: person_id
+        description: "FK a persona en sistema fuente (nulo para cuentas empresa)."
+      - name: store_id
+        description: "FK a tienda asociada."
+      - name: territory_id
+        description: "FK a territorio de ventas."
+      - name: full_name_hash
+        description: "Hash SHA2_256 del nombre completo — no reversible."
+        tests:
+          - not_null
+        meta:
+          pii: false
+          original_field: full_name
+          hash_algorithm: SHA2_256
+      - name: email_address_hash
+        description: "Hash SHA2_256 del email — no reversible."
+        tests:
+          - not_null
+        meta:
+          pii: false
+          original_field: email_address
+          hash_algorithm: SHA2_256
+      - name: phone_hash
+        description: "Hash SHA2_256 del telefono — no reversible."
+        meta:
+          pii: false
+          original_field: phone
+          hash_algorithm: SHA2_256
+      - name: city
+        description: "Ciudad del cliente (dato geografico, no PII)."
+        tests:
+          - not_null
+      - name: state_province_id
+        description: "FK a estado o provincia."
+      - name: postal_code
+        description: "Codigo postal."
+      - name: country_region
+        description: "Pais o region."
+      - name: _ingested_at
+        description: "Timestamp de ingestion en landing zone."
+        tests:
+          - not_null
+      - name: _source_system
+        description: "Sistema fuente."
+        tests:
+          - not_null
+      - name: _pipeline_name
+        description: "Pipeline de ingestion."
+      - name: _batch_id
+        description: "ID del lote de ingestion."
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt."
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # az_addresses — raw_crm.addresses
+  # ---------------------------------------------------------------------------
+  - name: az_addresses
+    description: >
+      Direcciones de clientes normalizadas y seguras para Azure Fabric.
+      address_line1 y address_line2 (PII — direccion fisica) hasheados SHA2_256.
+      Incluye customer_sk y customer_id para JOIN directo con az_customers en Fabric.
+      Granularidad: un registro por direccion activa (N por cliente).
+    meta:
+      owner: data-engineering
+      source_raw: raw_crm.addresses
+      pii_free: true
+      contract_status: visado
+    columns:
+      - name: address_id
+        description: "Clave primaria de la direccion."
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "Clave de negocio del cliente — FK a az_customers."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('az_customers')
+              field: customer_id
+              config:
+                severity: warn
+      - name: customer_sk
+        description: "Surrogate key del cliente — FK directa a az_customers.customer_sk."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('az_customers')
+              field: customer_sk
+              config:
+                severity: warn
+      - name: state_province_id
+        description: "FK a estado o provincia."
+      - name: address_line1_hash
+        description: "Hash SHA2_256 de la primera linea de direccion — no reversible."
+        tests:
+          - not_null
+        meta:
+          pii: false
+          original_field: address_line1
+          hash_algorithm: SHA2_256
+      - name: address_line2_hash
+        description: "Hash SHA2_256 de la segunda linea de direccion — no reversible."
+        meta:
+          pii: false
+          original_field: address_line2
+          hash_algorithm: SHA2_256
+      - name: city
+        description: "Ciudad (dato geografico, no PII)."
+        tests:
+          - not_null
+      - name: postal_code
+        description: "Codigo postal."
+      - name: country_region
+        description: "Pais o region."
+      - name: _ingested_at
+        description: "Timestamp de ingestion en landing zone."
+        tests:
+          - not_null
+      - name: _source_system
+        description: "Sistema fuente."
+        tests:
+          - not_null
+      - name: _source_entity
+        description: "Entidad fuente."
+      - name: _pipeline_name
+        description: "Pipeline de ingestion."
+      - name: _batch_id
+        description: "ID del lote."
+      - name: _raw_hash
+        description: "Hash SHA2_256 de la fila raw original (change detection)."
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt."
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # az_order_headers — raw_erp.order_headers
+  # ---------------------------------------------------------------------------
+  - name: az_order_headers
+    description: >
+      Cabeceras de ordenes de venta normalizadas para Azure Fabric.
+      Sin datos PII. Incluye customer_sk y customer_id para JOIN con az_customers.
+      Granularidad: un registro por orden de venta.
+    meta:
+      owner: data-engineering
+      source_raw: raw_erp.order_headers
+      pii_free: true
+      contract_status: visado
+    columns:
+      - name: sales_order_id
+        description: "Clave primaria de la orden. FK desde az_order_details."
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "Clave de negocio del cliente — FK a az_customers."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('az_customers')
+              field: customer_id
+              config:
+                severity: warn
+      - name: customer_sk
+        description: "Surrogate key del cliente — FK directa a az_customers.customer_sk."
+        tests:
+          - relationships:
+              to: ref('az_customers')
+              field: customer_sk
+              config:
+                severity: warn
+      - name: sales_person_id
+        description: "FK al vendedor."
+      - name: territory_id
+        description: "FK al territorio de ventas."
+      - name: revision_number
+        description: "Numero de revision de la orden."
+      - name: sales_order_number
+        description: "Numero de orden legible."
+        tests:
+          - not_null
+      - name: purchase_order_number
+        description: "Numero de orden de compra del cliente."
+      - name: account_number
+        description: "Numero de cuenta de la orden."
+      - name: order_date
+        description: "Fecha de la orden."
+        tests:
+          - not_null
+      - name: due_date
+        description: "Fecha de vencimiento comprometida."
+      - name: ship_date
+        description: "Fecha real de envio."
+      - name: status
+        description: "Estado (1=En Proceso, 2=Aprobada, 3=Backorder, 4=Rechazada, 5=Enviada, 6=Cancelada)."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6]
+              config:
+                severity: error
+      - name: online_order_flag
+        description: "1=orden online; 0=orden presencial."
+      - name: sub_total
+        description: "Subtotal antes de impuestos y flete."
+        tests:
+          - not_null
+      - name: tax_amt
+        description: "Monto de impuesto."
+      - name: freight
+        description: "Costo de flete."
+      - name: total_due
+        description: "Total a pagar incluyendo impuestos y flete."
+        tests:
+          - not_null
+      - name: _ingested_at
+        description: "Timestamp de ingestion en landing zone."
+        tests:
+          - not_null
+      - name: _source_system
+        description: "Sistema fuente."
+        tests:
+          - not_null
+      - name: _source_entity
+        description: "Entidad fuente."
+      - name: _pipeline_name
+        description: "Pipeline de ingestion."
+      - name: _batch_id
+        description: "ID del lote."
+      - name: _raw_hash
+        description: "Hash SHA2_256 de la fila raw original (change detection)."
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt."
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # az_order_details — raw_erp.order_details
+  # ---------------------------------------------------------------------------
+  - name: az_order_details
+    description: >
+      Lineas de detalle de ordenes de venta para Azure Fabric.
+      Sin datos PII. FK a az_order_headers (sales_order_id) y az_products (product_id).
+      Granularidad: una fila por linea de orden (PK compuesta: sales_order_id + sales_order_detail_id).
+    meta:
+      owner: data-engineering
+      source_raw: raw_erp.order_details
+      pii_free: true
+      contract_status: visado
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - sales_order_id
+            - sales_order_detail_id
+    columns:
+      - name: sales_order_id
+        description: "FK a la cabecera de orden — FK a az_order_headers."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('az_order_headers')
+              field: sales_order_id
+              config:
+                severity: error
+      - name: sales_order_detail_id
+        description: "Identificador de la linea dentro de la orden."
+        tests:
+          - not_null
+      - name: product_id
+        description: "FK al producto — FK a az_products."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('az_products')
+              field: product_id
+              config:
+                severity: warn
+      - name: special_offer_id
+        description: "FK a oferta especial aplicada."
+      - name: carrier_tracking_number
+        description: "Numero de tracking del transportista."
+      - name: order_qty
+        description: "Cantidad de unidades ordenadas."
+        tests:
+          - not_null
+      - name: unit_price
+        description: "Precio unitario sin descuento."
+        tests:
+          - not_null
+      - name: unit_price_discount
+        description: "Porcentaje de descuento (0.0 a 1.0)."
+      - name: line_total
+        description: "Total de la linea calculado por el sistema fuente."
+        tests:
+          - not_null
+      - name: _ingested_at
+        description: "Timestamp de ingestion en landing zone."
+        tests:
+          - not_null
+      - name: _source_system
+        description: "Sistema fuente."
+        tests:
+          - not_null
+      - name: _source_entity
+        description: "Entidad fuente."
+      - name: _pipeline_name
+        description: "Pipeline de ingestion."
+      - name: _batch_id
+        description: "ID del lote."
+      - name: _raw_hash
+        description: "Hash SHA2_256 de la fila raw original (change detection)."
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt."
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # az_products — raw_erp.products
+  # ---------------------------------------------------------------------------
+  - name: az_products
+    description: >
+      Catalogo de productos normalizado para Azure Fabric.
+      Sin datos PII. Incluye atributos fisicos, financieros e inventario.
+      Granularidad: un registro por producto.
+    meta:
+      owner: data-engineering
+      source_raw: raw_erp.products
+      pii_free: true
+      contract_status: visado
+    columns:
+      - name: product_id
+        description: "Clave primaria del producto. FK desde az_order_details."
+        tests:
+          - not_null
+          - unique
+      - name: product_number
+        description: "Codigo alfanumerico del producto."
+        tests:
+          - not_null
+      - name: product_name
+        description: "Nombre del producto."
+        tests:
+          - not_null
+      - name: standard_cost
+        description: "Costo estandar de produccion."
+      - name: list_price
+        description: "Precio de lista al publico."
+      - name: finished_goods_flag
+        description: "1=producto terminado; 0=componente o subensamble."
+      - name: color
+        description: "Color del producto."
+      - name: size
+        description: "Talla o tamano."
+      - name: weight
+        description: "Peso del producto."
+      - name: safety_stock_level
+        description: "Nivel minimo de stock de seguridad."
+      - name: reorder_point
+        description: "Punto de reorden para reabastecimiento."
+      - name: _ingested_at
+        description: "Timestamp de ingestion en landing zone."
+        tests:
+          - not_null
+      - name: _source_system
+        description: "Sistema fuente."
+        tests:
+          - not_null
+      - name: _source_entity
+        description: "Entidad fuente."
+      - name: _pipeline_name
+        description: "Pipeline de ingestion."
+      - name: _batch_id
+        description: "ID del lote."
+      - name: _raw_hash
+        description: "Hash SHA2_256 de la fila raw original (change detection)."
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt."
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # az_employees — raw_hr.employees
+  # ---------------------------------------------------------------------------
+  - name: az_employees
+    description: >
+      Empleados normalizados y seguros para Azure Fabric.
+      PII (national_id, login, birth_date) sustituido por hashes SHA2_256.
+      Granularidad: un registro por empleado activo.
+    meta:
+      owner: data-engineering
+      source_raw: raw_hr.employees
+      pii_free: true
+      contract_status: visado
+      pii_vault: int_pii_vault_employees
+    columns:
+      - name: employee_sk
+        description: "Surrogate key del empleado (PK)."
+        tests:
+          - not_null
+          - unique
+      - name: business_entity_id
+        description: "Clave de negocio del empleado (sistema fuente)."
+        tests:
+          - not_null
+          - unique
+      - name: national_id_hash
+        description: "Hash SHA2_256 del numero de identificacion nacional — no reversible."
+        tests:
+          - not_null
+        meta:
+          pii: false
+          original_field: national_id_number
+          hash_algorithm: SHA2_256
+      - name: login_id_hash
+        description: "Hash SHA2_256 del login de dominio — no reversible."
+        tests:
+          - not_null
+        meta:
+          pii: false
+          original_field: login_id
+          hash_algorithm: SHA2_256
+      - name: birth_date_hash
+        description: "Hash SHA2_256 de la fecha de nacimiento (ISO 8601) — no reversible."
+        tests:
+          - not_null
+        meta:
+          pii: false
+          original_field: birth_date
+          hash_algorithm: SHA2_256
+      - name: job_title
+        description: "Titulo del cargo."
+        tests:
+          - not_null
+      - name: marital_status
+        description: "Estado civil (M=Casado, S=Soltero)."
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['M', 'S']
+              config:
+                severity: warn
+      - name: gender
+        description: "Genero (M/F)."
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['M', 'F']
+              config:
+                severity: warn
+      - name: hire_date
+        description: "Fecha de contratacion."
+        tests:
+          - not_null
+      - name: salaried_flag
+        description: "1=asalariado; 0=por horas."
+      - name: vacation_hours
+        description: "Horas de vacaciones disponibles."
+      - name: sick_leave_hours
+        description: "Horas de licencia por enfermedad disponibles."
+      - name: _ingested_at
+        description: "Timestamp de ingestion en landing zone."
+        tests:
+          - not_null
+      - name: _source_system
+        description: "Sistema fuente."
+        tests:
+          - not_null
+      - name: _pipeline_name
+        description: "Pipeline de ingestion."
+      - name: _batch_id
+        description: "ID del lote."
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt."
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # az_departments — raw_hr.departments
+  # ---------------------------------------------------------------------------
+  - name: az_departments
+    description: >
+      Catalogo de departamentos normalizado para Azure Fabric.
+      Sin datos PII. Tabla de referencia organizacional.
+      Granularidad: un registro por departamento.
+    meta:
+      owner: data-engineering
+      source_raw: raw_hr.departments
+      pii_free: true
+      contract_status: visado
+    columns:
+      - name: department_id
+        description: "Clave primaria del departamento."
+        tests:
+          - not_null
+          - unique
+      - name: department_name
+        description: "Nombre del departamento."
+        tests:
+          - not_null
+      - name: department_group
+        description: "Grupo funcional al que pertenece el departamento."
+        tests:
+          - not_null
+      - name: _ingested_at
+        description: "Timestamp de ingestion en landing zone."
+        tests:
+          - not_null
+      - name: _source_system
+        description: "Sistema fuente."
+        tests:
+          - not_null
+      - name: _source_entity
+        description: "Entidad fuente."
+      - name: _pipeline_name
+        description: "Pipeline de ingestion."
+      - name: _batch_id
+        description: "ID del lote."
+      - name: _raw_hash
+        description: "Hash SHA2_256 de la fila raw original (change detection)."
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt."
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # az_orders — tabla analitica (bonus: cabecera + detalle unidos)
+  # ---------------------------------------------------------------------------
+  - name: az_orders
+    description: >
+      Vista analitica denormalizada de ordenes para Azure Fabric.
+      Une az_order_headers con az_order_details en granularidad linea.
+      Util para reportes rapidos sin JOIN adicional en Fabric.
+      Cliente referenciado solo por customer_sk (sin PII).
+      Granularidad: una fila por linea de orden.
+    meta:
+      owner: data-engineering
+      source_raw: raw_erp.order_headers + raw_erp.order_details
+      pii_free: true
+      contract_status: visado
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - sales_order_id
+            - sales_order_detail_id
+    columns:
+      - name: sales_order_id
+        description: "Identificador de la cabecera de orden."
+        tests:
+          - not_null
+      - name: sales_order_detail_id
+        description: "Identificador de la linea de detalle."
+        tests:
+          - not_null
+      - name: sales_order_number
+        description: "Numero de orden legible."
+        tests:
+          - not_null
+      - name: customer_sk
+        description: "Surrogate key del cliente — FK a az_customers.customer_sk (sin PII)."
+        tests:
+          - relationships:
+              to: ref('az_customers')
+              field: customer_sk
+              config:
+                severity: warn
+      - name: order_date
+        description: "Fecha de la orden."
+        tests:
+          - not_null
+      - name: due_date
+        description: "Fecha de vencimiento."
+      - name: ship_date
+        description: "Fecha real de envio."
+      - name: status
+        description: "Estado de la orden (1-6)."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6]
+              config:
+                severity: error
+      - name: online_order_flag
+        description: "1=online; 0=presencial."
+      - name: product_id
+        description: "FK al producto — FK a az_products."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('az_products')
+              field: product_id
+              config:
+                severity: warn
+      - name: order_qty
+        description: "Cantidad de unidades ordenadas."
+        tests:
+          - not_null
+      - name: unit_price
+        description: "Precio unitario sin descuento."
+        tests:
+          - not_null
+      - name: unit_price_discount
+        description: "Porcentaje de descuento (0.0 a 1.0)."
+      - name: line_total
+        description: "Total de linea del sistema fuente."
+        tests:
+          - not_null
+      - name: line_total_net
+        description: "Total neto calculado: qty * price * (1 - descuento)."
+      - name: discount_amount
+        description: "Monto de descuento aplicado."
+      - name: sub_total
+        description: "Subtotal de la cabecera."
+        tests:
+          - not_null
+      - name: total_due
+        description: "Total a cobrar incluyendo impuestos y flete."
+        tests:
+          - not_null
+      - name: _ingested_at
+        description: "Timestamp de ingestion en landing zone."
+        tests:
+          - not_null
+      - name: _source_system
+        description: "Sistema fuente."
+        tests:
+          - not_null
+      - name: _pipeline_name
+        description: "Pipeline de ingestion."
+      - name: _batch_id
+        description: "ID del lote."
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt."
+        tests:
+          - not_null

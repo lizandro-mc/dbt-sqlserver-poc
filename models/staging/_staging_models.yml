@@ -59,6 +59,11 @@ models:
         description: "FK al cliente propietario de la direccion"
         tests:
           - not_null
+          - relationships:
+              to: ref('stg_crm__customers')
+              field: customer_id
+              config:
+                severity: warn
       - name: address_line1
         description: "Primera linea de la direccion"
         tests:
@@ -115,7 +120,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: [1, 2, 3, 4, 5, 6]
+              arguments:
+                values: [1, 2, 3, 4, 5, 6]
               config:
                 severity: warn
       - name: online_order_flag
@@ -143,11 +149,21 @@ models:
     description: >
       Capa Staging de lineas de detalle de ordenes del ERP. Cada fila representa
       un producto dentro de una orden de venta.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - sales_order_id
+            - sales_order_detail_id
     columns:
       - name: sales_order_id
         description: "FK a la cabecera de orden"
         tests:
           - not_null
+          - relationships:
+              to: ref('stg_erp__order_headers')
+              field: sales_order_id
+              config:
+                severity: error
       - name: sales_order_detail_id
         description: "Identificador unico de la linea de detalle (PK junto con sales_order_id)"
         tests:
@@ -156,6 +172,11 @@ models:
         description: "FK al producto"
         tests:
           - not_null
+          - relationships:
+              to: ref('stg_erp__products')
+              field: product_id
+              config:
+                severity: warn
       - name: order_qty
         description: "Cantidad de unidades ordenadas"
         tests:
@@ -248,14 +269,16 @@ models:
         description: "Estado civil (M/S)"
         tests:
           - accepted_values:
-              values: ['M', 'S']
+              arguments:
+                values: ['M', 'S']
               config:
                 severity: warn
       - name: gender
         description: "Genero (M/F)"
         tests:
           - accepted_values:
-              values: ['M', 'F']
+              arguments:
+                values: ['M', 'F']
               config:
                 severity: warn
       - name: hire_date

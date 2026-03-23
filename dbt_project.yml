@@ -29,30 +29,35 @@ models:
   dbt_sqlserver_poc:
     staging:
       +materialized: view
-      +schema: stg
+      +schema: staging
       +tags:
         - staging
         - stg
 
     intermediate:
       +materialized: view
-      +schema: int
+      +schema: intermediate
       +tags:
         - intermediate
         - int
+      # Modelos de boveda PII — permanecen en SQL Server local, NUNCA en Azure
+      int_pii_vault_customers:
+        +tags:
+          - pii_vault
+          - restricted
+          - local_only
+      int_pii_vault_employees:
+        +tags:
+          - pii_vault
+          - restricted
+          - local_only
 
-    azure:
+    azure_fabric:
       +materialized: table
-      +schema: az
+      +schema: azure_fabric
       +tags:
         - azure
         - az
-      facts:
-        +tags:
-          - fact
-      dimensions:
-        +tags:
-          - dimension
 
 # Configuracion de Seeds
 seeds:

@@ -1,0 +1,347 @@
+version: 2
+
+# =============================================================================
+# Capa Intermediate
+#
+# Modelos de enriquecimiento y seguridad. Permanecen en SQL Server local.
+#
+# Modelos de boveda PII (tags: pii_vault, restricted, local_only):
+#   int_pii_vault_customers  — recuperar PII de clientes desde Azure
+#   int_pii_vault_employees  — recuperar PII de empleados desde Azure
+#
+# Uso de vaults: dado un customer_sk o customer_id de Azure Fabric,
+# hacer SELECT en int_pii_vault_customers para obtener los datos personales.
+# =============================================================================
+
+models:
+
+  # ---------------------------------------------------------------------------
+  # int_customers — Clientes enriquecidos con PII hasheado
+  # ---------------------------------------------------------------------------
+
+  - name: int_customers
+    description: >
+      Capa Intermedia de clientes. Une datos de CRM con direcciones, desduplicata
+      por customer_id (version mas reciente), limpia nombre y email, y genera
+      surrogate key. Agrega columnas hasheadas (SHA2_256) para los campos PII
+      (full_name, email_address, phone) para uso seguro en capas cloud.
+    columns:
+      - name: customer_sk
+        description: "Surrogate key del cliente generada con dbt_utils (MD5 de customer_id)"
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "Identificador natural del cliente (PK del sistema fuente)"
+        tests:
+          - not_null
+          - unique
+      - name: account_number
+        description: "Numero de cuenta del cliente"
+        tests:
+          - not_null
+      - name: full_name
+        description: "[PII] Nombre completo en mayusculas — solo para uso interno"
+        meta:
+          pii: true
+          classification: confidential
+      - name: email_address
+        description: "[PII] Email del cliente en minusculas — solo para uso interno"
+        meta:
+          pii: true
+          classification: confidential
+      - name: phone
+        description: "[PII] Telefono del cliente — solo para uso interno"
+        meta:
+          pii: true
+          classification: confidential
+      - name: full_name_hash
+        description: "Hash SHA2_256 del nombre completo — seguro para capas cloud"
+        tests:
+          - not_null
+        meta:
+          pii: false
+          classification: public
+      - name: email_address_hash
+        description: "Hash SHA2_256 del email — seguro para capas cloud"
+        tests:
+          - not_null
+        meta:
+          pii: false
+          classification: public
+      - name: phone_hash
+        description: "Hash SHA2_256 del telefono — seguro para capas cloud"
+        meta:
+          pii: false
+          classification: public
+      - name: city
+        description: "Ciudad del cliente (no PII)"
+        tests:
+          - not_null
+      - name: country_region
+        description: "Pais o region (no PII)"
+      - name: _ingested_at
+        description: "Timestamp de ingestion en la capa raw"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt"
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # int_employees — Empleados con PII hasheado
+  # ---------------------------------------------------------------------------
+
+  - name: int_employees
+    description: >
+      Capa Intermedia de empleados. Desduplicata por business_entity_id,
+      genera surrogate key, y hashea los campos PII sensibles
+      (national_id_number, login_id, birth_date) para transmision segura
+      hacia la capa Azure Fabric.
+    columns:
+      - name: employee_sk
+        description: "Surrogate key del empleado (MD5 de business_entity_id)"
+        tests:
+          - not_null
+          - unique
+      - name: business_entity_id
+        description: "Identificador natural del empleado (PK del sistema fuente)"
+        tests:
+          - not_null
+          - unique
+      - name: national_id_number
+        description: "[PII] Numero de identificacion nacional — solo uso interno"
+        meta:
+          pii: true
+          classification: restricted
+      - name: login_id
+        description: "[PII] ID de login en el dominio — solo uso interno"
+        meta:
+          pii: true
+          classification: confidential
+      - name: birth_date
+        description: "[PII] Fecha de nacimiento — solo uso interno"
+        meta:
+          pii: true
+          classification: restricted
+      - name: national_id_hash
+        description: "Hash SHA2_256 del numero de identificacion — seguro para cloud"
+        tests:
+          - not_null
+        meta:
+          pii: false
+          classification: public
+      - name: login_id_hash
+        description: "Hash SHA2_256 del login ID — seguro para cloud"
+        tests:
+          - not_null
+        meta:
+          pii: false
+          classification: public
+      - name: birth_date_hash
+        description: "Hash SHA2_256 de la fecha de nacimiento (ISO 8601) — seguro para cloud"
+        tests:
+          - not_null
+        meta:
+          pii: false
+          classification: public
+      - name: job_title
+        description: "Titulo del cargo (no PII)"
+        tests:
+          - not_null
+      - name: hire_date
+        description: "Fecha de contratacion"
+        tests:
+          - not_null
+      - name: marital_status
+        description: "Estado civil (M/S)"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['M', 'S']
+              config:
+                severity: warn
+      - name: gender
+        description: "Genero (M/F)"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['M', 'F']
+              config:
+                severity: warn
+      - name: _ingested_at
+        description: "Timestamp de ingestion en la capa raw"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt"
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # int_orders — Ordenes con cabecera y detalle unidos
+  # ---------------------------------------------------------------------------
+
+  - name: int_orders
+    description: >
+      Capa Intermedia de ordenes de venta. Une cabeceras y detalles del ERP
+      en una unica tabla de granularidad linea-de-orden. Referencia customer_sk
+      de int_customers para facilitar joins en la capa Azure Fabric.
+      Incluye campos calculados: line_total_net y discount_amount.
+    columns:
+      - name: sales_order_id
+        description: "FK a la cabecera de orden"
+        tests:
+          - not_null
+      - name: sales_order_detail_id
+        description: "Identificador de la linea de detalle"
+        tests:
+          - not_null
+      - name: customer_sk
+        description: "Surrogate key del cliente (FK a int_customers)"
+      - name: customer_id
+        description: "ID natural del cliente"
+        tests:
+          - not_null
+      - name: order_date
+        description: "Fecha en que se realizo la orden"
+        tests:
+          - not_null
+      - name: status
+        description: "Estado de la orden (1-6)"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6]
+              config:
+                severity: warn
+      - name: product_id
+        description: "FK al producto ordenado"
+        tests:
+          - not_null
+      - name: order_qty
+        description: "Cantidad de unidades ordenadas"
+        tests:
+          - not_null
+      - name: unit_price
+        description: "Precio unitario sin descuento"
+        tests:
+          - not_null
+      - name: line_total
+        description: "Total de linea reportado por el sistema fuente"
+        tests:
+          - not_null
+      - name: line_total_net
+        description: "Total neto calculado: qty * unit_price * (1 - descuento)"
+      - name: discount_amount
+        description: "Monto de descuento aplicado en la linea"
+      - name: _ingested_at
+        description: "Timestamp de ingestion en la capa raw"
+        tests:
+          - not_null
+      - name: _dbt_loaded_at
+        description: "Timestamp de procesamiento dbt"
+        tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # int_pii_vault_customers — RESTRINGIDO — solo SQL Server local
+  # ---------------------------------------------------------------------------
+
+  - name: int_pii_vault_customers
+    description: >
+      MODELO LOCAL RESTRINGIDO. Nunca subir a Azure ni a Fabric.
+      Boveda de PII de clientes. Vincula las claves de Azure
+      (customer_sk, customer_id) con los datos personales en claro.
+      Uso: dado un customer_sk de Azure Fabric, consultar aqui para
+      recuperar nombre, email, telefono y direccion fisica.
+    meta:
+      access: restricted
+      environment: local_only
+      pii_vault: true
+    columns:
+      - name: customer_sk
+        description: "Surrogate key — clave de vinculacion con az_customers.customer_sk"
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "Clave de negocio — clave de vinculacion con az_customers.customer_id"
+        tests:
+          - not_null
+          - unique
+      - name: full_name
+        description: "[PII] Nombre completo en claro"
+        meta: { pii: true }
+      - name: email_address
+        description: "[PII] Email en claro"
+        meta: { pii: true }
+      - name: phone
+        description: "[PII] Telefono en claro"
+        meta: { pii: true }
+      - name: address_line1
+        description: "[PII] Primera linea de direccion fisica en claro"
+        meta: { pii: true }
+      - name: address_line2
+        description: "[PII] Segunda linea de direccion fisica en claro"
+        meta: { pii: true }
+      - name: full_name_hash
+        description: "Hash SHA2_256 — verificacion cruzada con az_customers.full_name_hash"
+        tests:
+          - not_null
+      - name: email_address_hash
+        description: "Hash SHA2_256 — verificacion cruzada con az_customers.email_address_hash"
+        tests:
+          - not_null
+      - name: phone_hash
+        description: "Hash SHA2_256 — verificacion cruzada con az_customers.phone_hash"
+
+  # ---------------------------------------------------------------------------
+  # int_pii_vault_employees — RESTRINGIDO — solo SQL Server local
+  # ---------------------------------------------------------------------------
+
+  - name: int_pii_vault_employees
+    description: >
+      MODELO LOCAL RESTRINGIDO. Nunca subir a Azure ni a Fabric.
+      Boveda de PII de empleados. Vincula las claves de Azure
+      (employee_sk, business_entity_id) con los datos personales en claro.
+      Uso: dado un employee_sk de Azure Fabric, consultar aqui para
+      recuperar cedula, login y fecha de nacimiento.
+    meta:
+      access: restricted
+      environment: local_only
+      pii_vault: true
+    columns:
+      - name: employee_sk
+        description: "Surrogate key — clave de vinculacion con az_employees.employee_sk"
+        tests:
+          - not_null
+          - unique
+      - name: business_entity_id
+        description: "Clave de negocio — clave de vinculacion con az_employees.business_entity_id"
+        tests:
+          - not_null
+          - unique
+      - name: national_id_number
+        description: "[PII] Numero de identificacion nacional en claro"
+        meta: { pii: true }
+      - name: login_id
+        description: "[PII] Login de dominio en claro"
+        meta: { pii: true }
+      - name: birth_date
+        description: "[PII] Fecha de nacimiento en claro"
+        meta: { pii: true }
+      - name: national_id_hash
+        description: "Hash SHA2_256 — verificacion cruzada con az_employees.national_id_hash"
+        tests:
+          - not_null
+      - name: login_id_hash
+        description: "Hash SHA2_256 — verificacion cruzada con az_employees.login_id_hash"
+        tests:
+          - not_null
+      - name: birth_date_hash
+        description: "Hash SHA2_256 — verificacion cruzada con az_employees.birth_date_hash"
+        tests:
+          - not_null
